@@ -72,8 +72,12 @@ export function cancelWithOTP(pnr, otp) {
 }
 
 export function downloadTicketPdf(pnr) {
+    console.log("DEBUG - Token:", getToken());
+    console.log("DEBUG - URL:", `${API}/reservations/${pnr}/ticket`);
     return axios.get(`${API}/reservations/${pnr}/ticket`, {
-        ...authHeader(),
+        headers: {
+            Authorization: `Bearer ${getToken()}`
+        },
         responseType: "blob"
     }).then(res => res.data);
 }
