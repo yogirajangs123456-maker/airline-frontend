@@ -667,117 +667,7 @@ function getUserBookings() {
 }
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
-function generateTicketPDF(booking) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pw = 210;
 
-  // Background
-  doc.setFillColor(30, 58, 138);
-  doc.rect(0, 0, pw, 60, "F");
-
-  // Airline header
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(24);
-  doc.setFont("helvetica", "bold");
-  doc.text("✈ SkyWay Airlines", 20, 28);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("BOARDING PASS / E-TICKET", 20, 40);
-
-  // PNR box
-  doc.setFillColor(255, 255, 255, 30);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.text(`PNR: ${booking.pnr}`, pw - 20, 28, { align: "right" });
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("Keep this safe", pw - 20, 36, { align: "right" });
-
-  // White area
-  doc.setFillColor(255, 255, 255);
-  doc.rect(0, 60, pw, 237, "F");
-
-  // Route
-  doc.setTextColor(26, 26, 46);
-  doc.setFontSize(36);
-  doc.setFont("helvetica", "bold");
-  doc.text(booking.source?.slice(0, 3).toUpperCase(), 20, 90);
-  doc.text(booking.destination?.slice(0, 3).toUpperCase(), pw - 20, 90, { align: "right" });
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text(booking.source, 20, 98);
-  doc.text(booking.destination, pw - 20, 98, { align: "right" });
-
-  // Arrow
-  doc.setFontSize(18);
-  doc.setTextColor(37, 99, 235);
-  doc.text("→", pw / 2, 90, { align: "center" });
-
-  // Dashed line
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineDash([3, 3]);
-  doc.line(20, 108, pw - 20, 108);
-  doc.setLineDash([]);
-
-  // Cut circles
-  doc.setFillColor(240, 244, 255);
-  doc.circle(10, 108, 7, "F");
-  doc.circle(200, 108, 7, "F");
-
-  // Details grid
-  const detailY = 125;
-  const details = [
-    ["Passenger", booking.passengerName],
-    ["Flight No.", booking.flightNumber],
-    ["Journey Date", fmtDate(booking.journeyDate)],
-    ["Departure", fmtTime(booking.departureTime)],
-    ["Arrival", fmtTime(booking.arrivalTime)],
-    ["Seat", `${booking.seatNumber}`],
-    ["Class", "Economy"],
-    ["Status", booking.status],
-  ];
-
-  details.forEach((d, i) => {
-    const col = i % 2 === 0 ? 20 : pw / 2 + 10;
-    const row = detailY + Math.floor(i / 2) * 20;
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "normal");
-    doc.text(d[0].toUpperCase(), col, row);
-    doc.setFontSize(12);
-    doc.setTextColor(26, 26, 46);
-    doc.setFont("helvetica", "bold");
-    doc.text(d[1] || "-", col, row + 8);
-  });
-
-  // Price
-  doc.setFillColor(240, 244, 255);
-  doc.roundedRect(20, 215, pw - 40, 30, 4, 4, "F");
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
-  doc.setFont("helvetica", "normal");
-  doc.text("TOTAL FARE PAID", 30, 228);
-  doc.setFontSize(18);
-  doc.setTextColor(26, 26, 46);
-  doc.setFont("helvetica", "bold");
-  doc.text(fmt(booking.price), pw - 30, 232, { align: "right" });
-
-  // Footer
-  doc.setFillColor(30, 58, 138);
-  doc.rect(0, 255, pw, 42, "F");
-  doc.setFontSize(8);
-  doc.setTextColor(191, 219, 254);
-  doc.setFont("helvetica", "normal");
-  doc.text("Thank you for flying with SkyWay Airlines. Have a safe and pleasant journey!", pw / 2, 272, { align: "center" });
-  doc.text(`Booked on: ${new Date(booking.bookedAt).toLocaleString()}`, pw / 2, 280, { align: "center" });
-  doc.text("www.skyway-airlines.com | support@skyway.in | 1800-XXX-XXXX", pw / 2, 290, { align: "center" });
-
-  doc.save(`SkyWay_${booking.pnr}_Ticket.pdf`);
-}
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
@@ -807,7 +697,6 @@ export default function App() {
   return (
     <>
       <style>{styles}</style>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" />
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
@@ -1425,13 +1314,21 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
 
 // ─── Booking Success ──────────────────────────────────────────────────────────
 function BookingSuccess({ booking, navigate, showToast }) {
-  function downloadPDF() {
-    if (!window.jspdf) {
-      showToast("PDF library loading, please try in a moment.", "error");
-      return;
+  async function downloadPDF() {
+    try {
+      const blob = await Api.downloadTicketPdf(booking.pnr);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `SkyWay_${booking.pnr}_Ticket.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("Ticket PDF downloaded!", "success");
+    } catch (err) {
+      showToast("Failed to download ticket. Please try again.", "error");
     }
-    generateTicketPDF(booking);
-    showToast("Ticket PDF downloaded!", "success");
   }
 
   if (!booking) return null;
@@ -1520,10 +1417,21 @@ function MyBookings({ user, navigate, showToast }) {
   useEffect(() => {
     getUserBookings().then(setBookings);
   }, []);
-  function downloadTicket(booking) {
-    if (!window.jspdf) { showToast("Please wait a moment.", "error"); return; }
-    generateTicketPDF(booking);
-    showToast("Ticket downloaded!", "success");
+  async function downloadTicket(booking) {
+    try {
+      const blob = await Api.downloadTicketPdf(booking.pnr);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `SkyWay_${booking.pnr}_Ticket.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("Ticket downloaded!", "success");
+    } catch (err) {
+      showToast("Failed to download ticket. Please try again.", "error");
+    }
   }
 
   return (

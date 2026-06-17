@@ -70,3 +70,10 @@ export function cancelWithOTP(pnr, otp) {
     return axios.post(`${API}/otp/cancel`, { pnr, otp }, authHeader())
         .then(res => res.data);
 }
+
+export function downloadTicketPdf(pnr) {
+    return axios.get(`${API}/reservations/${pnr}/ticket`, {
+        ...authHeader(),
+        responseType: "blob"
+    }).then(res => res.data);
+}
