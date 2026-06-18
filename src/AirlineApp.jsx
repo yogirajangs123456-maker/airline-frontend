@@ -1417,6 +1417,7 @@ function MyBookings({ user, navigate, showToast }) {
   useEffect(() => {
     getUserBookings().then(setBookings);
   }, []);
+
   async function downloadTicket(booking) {
     try {
       const blob = await Api.downloadTicketPdf(booking.pnr);
@@ -1453,8 +1454,8 @@ function MyBookings({ user, navigate, showToast }) {
         bookings.map(b => (
           <div key={b.pnr} className="booking-item">
             <div>
-              <div className="booking-route">{b.source} → {b.destination}</div>
-              <div className="booking-meta">{b.flightNumber} · {fmtDate(b.journeyDate)} · Seat {b.seatNumber} · {fmt(b.price)}</div>
+              <div className="booking-route">{b.flight?.source} → {b.flight?.destination}</div>
+              <div className="booking-meta">{b.flight?.flightNumber} · {fmtDate(b.flight?.journeyDate)} · Seat {b.seatNumber} · {fmt(b.totalPrice)}</div>
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
                 <div className="booking-pnr">{b.pnr}</div>
                 <span className={`badge ${b.status === "CONFIRMED" ? "badge-green" : "badge-red"}`}>{b.status}</span>
@@ -1475,7 +1476,6 @@ function MyBookings({ user, navigate, showToast }) {
     </div>
   );
 }
-
 // ─── Cancel Ticket ────────────────────────────────────────────────────────────
 function CancelTicket({ user, navigate, showToast }) {
   const [step, setStep] = useState("pnr"); // pnr | otp | done
