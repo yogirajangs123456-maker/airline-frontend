@@ -2,12 +2,10 @@ import axios from "axios";
 
 const API = `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api`;
 
-// This reads the JWT token saved after login
 function getToken() {
     return localStorage.getItem("token");
 }
 
-// This adds the token to every request automatically
 function authHeader() {
     return {
         headers: {
@@ -47,10 +45,17 @@ export function lockSeat(flightId, seatNumber) {
     ).then(res => res.data);
 }
 
-// ── BOOKING ───────────────────────────────────────────
-export function confirmBooking(flightId, seatNumber, passengerName, totalPrice) {
+export function unlockSeatApi(flightId, seatNumber) {
+    return axios.post(`${API}/reservations/unlock-seat`,
+        { flightId, seatNumber },
+        authHeader()
+    ).then(res => res.data).catch(() => null);
+}
+
+// ── BOOKING (now multi-passenger) ──────────────────────
+export function confirmBooking(flightId, passengers, totalPrice) {
     return axios.post(`${API}/reservations`,
-        { flightId, seatNumber, passengerName, totalPrice },
+        { flightId, passengers, totalPrice },
         authHeader()
     ).then(res => res.data);
 }
@@ -60,24 +65,39 @@ export function getMyBookings() {
         .then(res => res.data);
 }
 
-// ── OTP & CANCEL ──────────────────────────────────────
+export function getBookingByPnr(pnr) {
+    return axios.get(`${API}/reservations/${pnr}`, authHeader())
+        .then(res => res.data);
+}
+
+// ── CANCELLATION FLOW ──────────────────────────────────
+export function getRefundPreview(pnr, passengerIds) {
+    return axios.post(`${API}/otp/refund-preview`,
+        { pnr, passengerIds },
+        authHeader()
+    ).then(res => res.data);
+}
+
 export function sendCancelOTP(pnr) {
     return axios.post(`${API}/otp/send`, { pnr }, authHeader())
         .then(res => res.data);
 }
 
-export function cancelWithOTP(pnr, otp) {
-    return axios.post(`${API}/otp/cancel`, { pnr, otp }, authHeader())
+export function cancelWithOTP(pnr, otp, passengerIds) {
+    return axios.post(`${API}/otp/cancel`, { pnr, otp, passengerIds }, authHeader())
         .then(res => res.data);
 }
 
+// ── TICKET PDF ──────────────────────────────────────────
 export function downloadTicketPdf(pnr) {
-    console.log("DEBUG - Token:", getToken());
-    console.log("DEBUG - URL:", `${API}/reservations/${pnr}/ticket`);
     return axios.get(`${API}/reservations/${pnr}/ticket`, {
         headers: {
             Authorization: `Bearer ${getToken()}`
         },
         responseType: "blob"
     }).then(res => res.data);
+}
+
+export function getCities() {
+    return axios.get(`${API}/flights/cities`).then(res => res.data);
 }

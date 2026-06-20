@@ -18,12 +18,29 @@ const styles = `
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: 'Inter', sans-serif;
-    background: #f0f4ff;
-    color: #1a1a2e;
-    min-height: 100vh;
-  }
+  html, body {
+  font-family: 'Inter', sans-serif;
+  background: #f0f4ff;
+  color: #1a1a2e;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+input, select, textarea, button {
+  color-scheme: light;
+}
+
+input, select, textarea {
+  background-color: #fff !important;
+  color: #1a1a2e !important;
+  caret-color: #1a1a2e;
+}
+
+input::placeholder {
+  color: #94a3b8 !important;
+}
 
   /* ── Nav ── */
   .nav {
@@ -579,11 +596,41 @@ const styles = `
   .success-circle { width: 80px; height: 80px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem; }
 
   @media (max-width: 768px) {
-    .search-grid { grid-template-columns: 1fr 1fr; }
-    .feature-grid { grid-template-columns: 1fr; }
-    .flight-card { grid-template-columns: 1fr; }
-    .ticket-details { grid-template-columns: repeat(2, 1fr); }
+  .search-grid { grid-template-columns: 1fr 1fr; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .flight-card { grid-template-columns: 1fr; }
+  .ticket-details { grid-template-columns: repeat(2, 1fr); }
+
+  .nav {
+    padding: 0 1rem;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 64px;
   }
+  .nav-links {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    padding: 8px 0;
+  }
+  .hero {
+    padding: 2.5rem 1rem 2rem;
+  }
+  .search-card {
+    padding: 1.25rem;
+    max-width: 100%;
+    margin: 0;
+  }
+  .page, .page-sm {
+    padding: 1rem;
+  }
+  .booking-item {
+    grid-template-columns: 1fr;
+  }
+  .pay-summary-row {
+    font-size: 0.8125rem;
+  }
+}
 `;
 
 // ─── Airline brand map ────────────────────────────────────────────────────────
@@ -729,11 +776,11 @@ export default function App() {
       {page === "signup" && <SignupPage setUser={setUser} navigate={navigate} showToast={showToast} />}
       {page === "results" && <FlightResults context={flightContext} user={user} navigate={navigate} showToast={showToast} />}
       {page === "seats" && <SeatSelection context={flightContext} user={user} navigate={navigate} showToast={showToast} />}
+      {page === "passengers" && <PassengerDetails context={flightContext} user={user} navigate={navigate} showToast={showToast} />}
       {page === "payment" && <PaymentPage context={flightContext} user={user} navigate={navigate} showToast={showToast} setBookingResult={setBookingResult} />}
       {page === "success" && <BookingSuccess booking={bookingResult} navigate={navigate} showToast={showToast} />}
       {page === "bookings" && <MyBookings user={user} navigate={navigate} showToast={showToast} />}
-      {page === "cancel" && <CancelTicket user={user} navigate={navigate} showToast={showToast} />}
-    </>
+      {page === "cancel" && <CancelTicket user={user} navigate={navigate} showToast={showToast} context={flightContext} />}    </>
   );
 }
 
@@ -742,12 +789,19 @@ function HomePage({ user, navigate, showToast }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [cities, setCities] = useState([]);
+
+  useEffect(() => {
+    Api.getCities().then(setCities).catch(() => setCities([]));
+  }, []);
 
   function handleSearch(e) {
     e.preventDefault();
-    if (!from || !to) { showToast("Please enter origin and destination.", "error"); return; }
+    const trimmedFrom = from.trim();
+    const trimmedTo = to.trim();
+    if (!trimmedFrom || !trimmedTo) { showToast("Please enter origin and destination.", "error"); return; }
     if (!user) { showToast("Please login to search flights.", "error"); navigate("login"); return; }
-    navigate("results", { from, to, date });
+    navigate("results", { from: trimmedFrom, to: trimmedTo, date });
   }
 
   return (
@@ -765,11 +819,11 @@ function HomePage({ user, navigate, showToast }) {
           <form className="search-grid" onSubmit={handleSearch}>
             <div className="field-group">
               <span className="field-label">From</span>
-              <input className="field-input" placeholder="City or Airport" value={from} onChange={e => setFrom(e.target.value)} />
+              <CityAutocomplete value={from} onChange={setFrom} placeholder="City or Airport" allCities={cities} />
             </div>
             <div className="field-group">
               <span className="field-label">To</span>
-              <input className="field-input" placeholder="City or Airport" value={to} onChange={e => setTo(e.target.value)} />
+              <CityAutocomplete value={to} onChange={setTo} placeholder="City or Airport" allCities={cities} />
             </div>
             <div className="field-group">
               <span className="field-label">Date</span>
@@ -929,6 +983,65 @@ function SignupPage({ setUser, navigate, showToast }) {
   );
 }
 
+function CityAutocomplete({ value, onChange, placeholder, allCities }) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filtered, setFiltered] = useState([]);
+
+  function handleChange(val) {
+    onChange(val);
+    const trimmed = val.trim();
+    if (trimmed.length === 0) {
+      setFiltered([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const matches = allCities.filter(c =>
+      c.toLowerCase().startsWith(trimmed.toLowerCase())
+    ).slice(0, 6);
+    setFiltered(matches);
+    setShowSuggestions(matches.length > 0);
+  }
+
+  function selectCity(city) {
+    onChange(city);
+    setShowSuggestions(false);
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        className="field-input"
+        placeholder={placeholder}
+        value={value}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => value && handleChange(value)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+        autoComplete="off"
+      />
+      {showSuggestions && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0,
+          background: "#fff", border: "1.5px solid #e5e9f2", borderRadius: 10,
+          marginTop: 4, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          zIndex: 50, overflow: "hidden"
+        }}>
+          {filtered.map(city => (
+            <div
+              key={city}
+              onClick={() => selectCity(city)}
+              style={{ padding: "10px 14px", cursor: "pointer", fontSize: "0.9375rem", color: "#1a1a2e" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f0f4ff"}
+              onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+            >
+              ✈ {city}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Flight Results ───────────────────────────────────────────────────────────
 function FlightResults({ context, user, navigate, showToast }) {
   const [flights, setFlights] = useState([]);
@@ -1037,36 +1150,44 @@ function SeatSelection({ context, user, navigate, showToast }) {
   const flight = context.flight;
   const ROWS = 5;
   const COLS = ["A", "B", "C", "D", "E", "F"];
+  const MAX_PASSENGERS = 6;
 
   const [bookedSeats, setBookedSeats] = useState([]);
-  const [selectedSeat, setSelectedSeat] = useState(null);
-  const [lockingSeats, setLockingSeats] = useState([]);
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchBookedSeats(flight.flightId).then(data => {
-      setBookedSeats(data);
+    Api.getSeats(flight.flightId).then(data => {
+      setBookedSeats(data.booked || []);
       setLoading(false);
     });
-    // Release lock on unmount
     return () => {
-      if (selectedSeat) unlockSeat(flight.flightId, selectedSeat);
+      selectedSeats.forEach(seat => Api.unlockSeatApi(flight.flightId, seat));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSeatClick(seatNum) {
     if (bookedSeats.includes(seatNum)) return;
-    if (lockingSeats.includes(seatNum)) { showToast("This seat is being held by another user.", "error"); return; }
 
-    // Release previous lock
-    if (selectedSeat) await unlockSeat(flight.flightId, selectedSeat);
+    if (selectedSeats.includes(seatNum)) {
+      await Api.unlockSeatApi(flight.flightId, seatNum);
+      setSelectedSeats(prev => prev.filter(s => s !== seatNum));
+      return;
+    }
 
-    // Try to acquire lock
-    const locked = await lockSeat(flight.flightId, seatNum);
-    if (!locked) { showToast("Seat just taken! Please choose another.", "error"); return; }
+    if (selectedSeats.length >= MAX_PASSENGERS) {
+      showToast(`You can select a maximum of ${MAX_PASSENGERS} seats per booking.`, "error");
+      return;
+    }
 
-    setSelectedSeat(seatNum);
-    showToast(`Seat ${seatNum} selected and temporarily held for you.`, "success");
+    try {
+      await Api.lockSeat(flight.flightId, seatNum);
+      setSelectedSeats(prev => [...prev, seatNum]);
+      showToast(`Seat ${seatNum} selected and held for you.`, "success");
+    } catch {
+      showToast("Seat just taken! Please choose another.", "error");
+    }
   }
 
   function getSeatNum(row, col) {
@@ -1075,14 +1196,13 @@ function SeatSelection({ context, user, navigate, showToast }) {
 
   function getSeatClass(seatNum) {
     if (bookedSeats.includes(seatNum)) return "booked";
-    if (lockingSeats.includes(seatNum)) return "locking";
-    if (selectedSeat === seatNum) return "selected";
+    if (selectedSeats.includes(seatNum)) return "selected";
     return "avail";
   }
 
   function proceed() {
-    if (!selectedSeat) { showToast("Please select a seat.", "error"); return; }
-    navigate("payment", { ...context, selectedSeat });
+    if (selectedSeats.length === 0) { showToast("Please select at least one seat.", "error"); return; }
+    navigate("passengers", { ...context, selectedSeats });
   }
 
   const brand = getAirlineBrand(flight.airlineCode);
@@ -1104,20 +1224,23 @@ function SeatSelection({ context, user, navigate, showToast }) {
       </div>
 
       <div className="seat-map-wrap">
-        <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.25rem", fontWeight: 700, marginBottom: "1.25rem", color: "#1a1a2e" }}>Select Your Seat</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.25rem" }}>
+          <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.25rem", fontWeight: 700, color: "#1a1a2e" }}>Select Seats</h2>
+          <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600 }}>
+            {selectedSeats.length} / {MAX_PASSENGERS} selected
+          </span>
+        </div>
 
         <div className="seat-legend">
           <div className="legend-item"><div className="legend-dot" style={{ background: "#dcfce7", border: "2px solid #86efac" }} />Available</div>
           <div className="legend-item"><div className="legend-dot" style={{ background: "#2563eb" }} />Your Selection</div>
           <div className="legend-item"><div className="legend-dot" style={{ background: "#fee2e2", border: "2px solid #fca5a5" }} />Booked</div>
-          <div className="legend-item"><div className="legend-dot" style={{ background: "#fef3c7", border: "2px solid #fcd34d" }} />Being held</div>
         </div>
 
         {loading ? <div className="spinner" /> : (
           <div className="plane-body">
             <div className="plane-nose">✈</div>
 
-            {/* Col labels */}
             <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 10 }}>
               <div style={{ width: 20 }} />
               {COLS.map((c, i) => (
@@ -1140,8 +1263,8 @@ function SeatSelection({ context, user, navigate, showToast }) {
                       <div
                         key={seatNum}
                         className={`seat-box ${cls}`}
-                        onClick={() => cls !== "booked" && cls !== "locking" && handleSeatClick(seatNum)}
-                        title={cls === "booked" ? "Already booked" : cls === "locking" ? "Being held" : `Seat ${seatNum}`}
+                        onClick={() => cls !== "booked" && handleSeatClick(seatNum)}
+                        title={cls === "booked" ? "Already booked" : `Seat ${seatNum}`}
                       >
                         {seatNum}
                       </div>
@@ -1154,13 +1277,13 @@ function SeatSelection({ context, user, navigate, showToast }) {
         )}
 
         <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
-          {selectedSeat && (
+          {selectedSeats.length > 0 && (
             <div style={{ marginBottom: 12, fontSize: "0.9375rem", color: "#374151" }}>
-              Selected: <strong style={{ color: "#2563eb" }}>Seat {selectedSeat}</strong> — locked for 10 minutes
+              Selected: <strong style={{ color: "#2563eb" }}>{selectedSeats.join(", ")}</strong> — held for 10 minutes
             </div>
           )}
-          <button className="book-btn" onClick={proceed} style={{ padding: "12px 40px", fontSize: "1rem", borderRadius: 10, opacity: selectedSeat ? 1 : 0.5 }}>
-            Proceed to Payment →
+          <button className="book-btn" onClick={proceed} style={{ padding: "12px 40px", fontSize: "1rem", borderRadius: 10, opacity: selectedSeats.length ? 1 : 0.5 }}>
+            Continue with {selectedSeats.length} passenger{selectedSeats.length !== 1 ? "s" : ""} →
           </button>
         </div>
       </div>
@@ -1171,15 +1294,17 @@ function SeatSelection({ context, user, navigate, showToast }) {
 // ─── Payment Page ─────────────────────────────────────────────────────────────
 function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
   const flight = context.flight;
+  const passengers = context.passengers;
   const [cardName, setCardName] = useState(user?.name || "");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [step, setStep] = useState("form"); // form | processing | done
+  const [step, setStep] = useState("form");
 
-  const taxes = Math.round(flight.price * 0.18);
-  const total = flight.price + taxes;
+  const baseFare = flight.price * passengers.length;
+  const taxes = Math.round(baseFare * 0.18);
+  const total = baseFare + taxes;
 
   function formatCardNumber(val) {
     return val.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
@@ -1198,35 +1323,21 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
     setStep("processing");
 
     try {
-      const pnr = await confirmBooking({
-        flightId: flight.flightId,
-        seatNumber: context.selectedSeat,
-        userId: user.email,
-        passengerName: user.name,
-        flightNumber: flight.flightNumber,
-        source: flight.source,
-        destination: flight.destination,
-        departureTime: flight.departureTime,
-        arrivalTime: flight.arrivalTime,
-        journeyDate: flight.journeyDate,
-        price: total,
-        airlineCode: flight.airlineCode,
-      });
+      const result = await Api.confirmBooking(flight.flightId, passengers, total);
 
       const booking = {
-        pnr, flightId: flight.flightId, seatNumber: context.selectedSeat,
-        userId: user.email, passengerName: user.name,
-        flightNumber: flight.flightNumber, source: flight.source,
-        destination: flight.destination, departureTime: flight.departureTime,
-        arrivalTime: flight.arrivalTime, journeyDate: flight.journeyDate,
-        price: total, airlineCode: flight.airlineCode, status: "CONFIRMED",
+        pnr: result.pnr,
+        flight,
+        passengers: passengers.map(p => ({ ...p, status: "CONFIRMED" })),
+        totalPrice: total,
+        status: "ACTIVE",
         bookedAt: new Date().toISOString(),
       };
 
       setBookingResult(booking);
       navigate("success");
     } catch (err) {
-      showToast(err.message || "Payment failed. Please try again.", "error");
+      showToast(err.response?.data?.error || "Payment failed. Please try again.", "error");
       setStep("form");
       setProcessing(false);
     }
@@ -1234,7 +1345,7 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
 
   return (
     <div className="page" style={{ maxWidth: 700 }}>
-      <button className="back-link" onClick={() => navigate("seats")}>← Back to seat selection</button>
+      <button className="back-link" onClick={() => navigate("passengers")}>← Back to passenger details</button>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1.5rem", alignItems: "start" }}>
         <div>
@@ -1269,14 +1380,6 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 10, marginBottom: "1rem" }}>
-                {["UPI", "Net Banking", "Wallet"].map(m => (
-                  <div key={m} style={{ flex: 1, border: "1.5px solid #e5e9f2", borderRadius: 10, padding: "10px", textAlign: "center", cursor: "pointer", fontSize: "0.8125rem", color: "#64748b", fontWeight: 500 }}>
-                    {m}
-                  </div>
-                ))}
-              </div>
-
               <button type="submit" className="submit-btn" disabled={processing}>
                 Pay {fmt(total)} Securely 🔒
               </button>
@@ -1290,21 +1393,18 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
         <div style={{ position: "sticky", top: 80 }}>
           <div className="pay-summary">
             <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem", color: "#1a1a2e" }}>Booking Summary</div>
-            <div className="pay-summary-row"><span>Flight</span><span>{context.flight.flightNumber}</span></div>
+            <div className="pay-summary-row"><span>Flight</span><span>{flight.flightNumber}</span></div>
             <div className="pay-summary-row"><span>Route</span><span>{flight.source} → {flight.destination}</span></div>
             <div className="pay-summary-row"><span>Date</span><span>{fmtDate(flight.journeyDate)}</span></div>
-            <div className="pay-summary-row"><span>Seat</span><span>{context.selectedSeat}</span></div>
-            <div className="pay-summary-row"><span>Base Fare</span><span>{fmt(flight.price)}</span></div>
+            <div className="pay-summary-row"><span>Passengers</span><span>{passengers.length}</span></div>
+            {passengers.map(p => (
+              <div className="pay-summary-row" key={p.seatNumber} style={{ fontSize: "0.8125rem", color: "#64748b" }}>
+                <span>{p.passengerName}</span><span>Seat {p.seatNumber}</span>
+              </div>
+            ))}
+            <div className="pay-summary-row"><span>Base Fare ({passengers.length} × {fmt(flight.price)})</span><span>{fmt(baseFare)}</span></div>
             <div className="pay-summary-row"><span>Taxes & Fees (18%)</span><span>{fmt(taxes)}</span></div>
             <div className="pay-summary-row"><span>Total</span><span>{fmt(total)}</span></div>
-          </div>
-
-          <div style={{ background: "#fff", border: "1.5px solid #e5e9f2", borderRadius: 12, padding: "1rem", fontSize: "0.8125rem", color: "#64748b" }}>
-            <div style={{ fontWeight: 600, color: "#1a1a2e", marginBottom: 8 }}>✅ What you get</div>
-            <div style={{ marginBottom: 4 }}>• PNR number immediately</div>
-            <div style={{ marginBottom: 4 }}>• E-ticket PDF download</div>
-            <div style={{ marginBottom: 4 }}>• OTP-based cancellation</div>
-            <div>• Seat lock — no double booking</div>
           </div>
         </div>
       </div>
@@ -1332,66 +1432,68 @@ function BookingSuccess({ booking, navigate, showToast }) {
   }
 
   if (!booking) return null;
+  const flight = booking.flight;
 
   return (
     <div className="page" style={{ maxWidth: 700 }}>
       <div className="success-animation">
         <div className="success-circle">✅</div>
         <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.75rem", fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>Booking Confirmed!</h2>
-        <p style={{ color: "#64748b", marginBottom: "2rem" }}>Your seat is locked. Save your PNR for check-in and cancellation.</p>
+        <p style={{ color: "#64748b", marginBottom: "2rem" }}>Save your PNR for check-in and cancellation.</p>
       </div>
 
       <div className="ticket-preview" style={{ marginBottom: "1.5rem" }}>
         <div className="ticket-header">
           <div>
             <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)", marginBottom: 4 }}>AIRLINE</div>
-            <div className="ticket-airline">{getAirlineBrand(booking.airlineCode).name}</div>
+            <div className="ticket-airline">{getAirlineBrand(flight.airlineCode).name}</div>
           </div>
           <div className="ticket-pnr">PNR: {booking.pnr}</div>
         </div>
 
         <div className="ticket-route">
           <div>
-            <div className="ticket-city">{booking.source?.slice(0, 3).toUpperCase()}</div>
-            <div className="ticket-city-name">{booking.source}</div>
+            <div className="ticket-city">{flight.source?.slice(0, 3).toUpperCase()}</div>
+            <div className="ticket-city-name">{flight.source}</div>
           </div>
           <div className="ticket-middle">
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)", marginBottom: 4 }}>{booking.flightNumber}</div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)", marginBottom: 4 }}>{flight.flightNumber}</div>
             <div style={{ fontSize: "1.5rem" }}>✈</div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)", marginTop: 4 }}>Non-stop</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div className="ticket-city">{booking.destination?.slice(0, 3).toUpperCase()}</div>
-            <div className="ticket-city-name">{booking.destination}</div>
+            <div className="ticket-city">{flight.destination?.slice(0, 3).toUpperCase()}</div>
+            <div className="ticket-city-name">{flight.destination}</div>
           </div>
         </div>
 
         <div className="ticket-divider" />
 
+        <div style={{ marginBottom: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Passengers</div>
+          {booking.passengers.map(p => (
+            <div key={p.seatNumber} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", fontWeight: 600, padding: "4px 0" }}>
+              <span>{p.passengerName}</span>
+              <span>Seat {p.seatNumber}</span>
+            </div>
+          ))}
+        </div>
+
         <div className="ticket-details">
           <div className="ticket-detail-item">
-            <div className="ticket-detail-label">Passenger</div>
-            <div className="ticket-detail-value">{booking.passengerName}</div>
-          </div>
-          <div className="ticket-detail-item">
             <div className="ticket-detail-label">Journey Date</div>
-            <div className="ticket-detail-value">{fmtDate(booking.journeyDate)}</div>
+            <div className="ticket-detail-value">{fmtDate(flight.journeyDate)}</div>
           </div>
           <div className="ticket-detail-item">
             <div className="ticket-detail-label">Departure</div>
-            <div className="ticket-detail-value">{fmtTime(booking.departureTime)}</div>
-          </div>
-          <div className="ticket-detail-item">
-            <div className="ticket-detail-label">Seat</div>
-            <div className="ticket-detail-value">Seat {booking.seatNumber}</div>
+            <div className="ticket-detail-value">{fmtTime(flight.departureTime)}</div>
           </div>
           <div className="ticket-detail-item">
             <div className="ticket-detail-label">Arrival</div>
-            <div className="ticket-detail-value">{fmtTime(booking.arrivalTime)}</div>
+            <div className="ticket-detail-value">{fmtTime(flight.arrivalTime)}</div>
           </div>
           <div className="ticket-detail-item">
-            <div className="ticket-detail-label">Fare Paid</div>
-            <div className="ticket-detail-value">{fmt(booking.price)}</div>
+            <div className="ticket-detail-label">Total Paid</div>
+            <div className="ticket-detail-value">{fmt(booking.totalPrice)}</div>
           </div>
         </div>
       </div>
@@ -1410,21 +1512,25 @@ function BookingSuccess({ booking, navigate, showToast }) {
     </div>
   );
 }
-
 // ─── My Bookings ──────────────────────────────────────────────────────────────
 function MyBookings({ user, navigate, showToast }) {
   const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    getUserBookings().then(setBookings);
+    Api.getMyBookings().then(data => {
+      setBookings(data);
+      setLoading(false);
+    });
   }, []);
 
-  async function downloadTicket(booking) {
+  async function downloadTicket(pnr) {
     try {
-      const blob = await Api.downloadTicketPdf(booking.pnr);
+      const blob = await Api.downloadTicketPdf(pnr);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `SkyWay_${booking.pnr}_Ticket.pdf`;
+      link.download = `SkyWay_${pnr}_Ticket.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1433,6 +1539,14 @@ function MyBookings({ user, navigate, showToast }) {
     } catch (err) {
       showToast("Failed to download ticket. Please try again.", "error");
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="spinner" />
+      </div>
+    );
   }
 
   return (
@@ -1451,46 +1565,126 @@ function MyBookings({ user, navigate, showToast }) {
           </button>
         </div>
       ) : (
-        bookings.map(b => (
-          <div key={b.pnr} className="booking-item">
-            <div>
-              <div className="booking-route">{b.flight?.source} → {b.flight?.destination}</div>
-              <div className="booking-meta">{b.flight?.flightNumber} · {fmtDate(b.flight?.journeyDate)} · Seat {b.seatNumber} · {fmt(b.totalPrice)}</div>
-              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
-                <div className="booking-pnr">{b.pnr}</div>
-                <span className={`badge ${b.status === "CONFIRMED" ? "badge-green" : "badge-red"}`}>{b.status}</span>
+        bookings.map(b => {
+          const confirmedCount = b.passengers.filter(p => p.status === "CONFIRMED").length;
+          const cancelledCount = b.passengers.filter(p => p.status === "CANCELLED").length;
+          return (
+            <div key={b.pnr} className="booking-item" style={{ gridTemplateColumns: "1fr auto", alignItems: "start" }}>
+              <div>
+                <div className="booking-route">{b.flight?.source} → {b.flight?.destination}</div>
+                <div className="booking-meta">{b.flight?.flightNumber} · {fmtDate(b.flight?.journeyDate)} · {fmtTime(b.flight?.departureTime)}</div>
+
+                <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <div className="booking-pnr">{b.pnr}</div>
+                  <span className={`badge ${b.status === "ACTIVE" ? "badge-green" : "badge-red"}`}>{b.status}</span>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  {b.passengers.map(p => (
+                    <div key={p.passengerId} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", padding: "4px 0", color: p.status === "CANCELLED" ? "#dc2626" : "#374151" }}>
+                      <span>{p.passengerName} — Seat {p.seatNumber}</span>
+                      <span style={{ fontWeight: 600, fontSize: "0.75rem" }}>{p.status}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {b.refundAmount > 0 && (
+                  <div style={{ marginTop: 10, fontSize: "0.8125rem", color: "#dc2626", fontWeight: 600 }}>
+                    Refund Amount: {fmt(b.refundAmount)} Refunded
+                  </div>
+                )}
+
+                <div style={{ marginTop: 8, fontSize: "0.8125rem", color: "#64748b" }}>
+                  Total Paid: {fmt(b.totalPrice)}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button className="book-btn" onClick={() => downloadTicket(b.pnr)}>📥 Ticket</button>
+                {confirmedCount > 0 && (
+                  <button className="cancel-btn" onClick={() => navigate("cancel", { pnr: b.pnr })}>Cancel Passengers</button>
+                )}
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {b.status === "CONFIRMED" && (
-                <>
-                  <button className="book-btn" onClick={() => downloadTicket(b)}>📥 Ticket</button>
-                  <button className="cancel-btn" onClick={() => navigate("cancel")}>Cancel</button>
-                </>
-              )}
-              {b.status === "CANCELLED" && <span style={{ fontSize: "0.8125rem", color: "#dc2626", fontWeight: 600 }}>Cancelled</span>}
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
 }
 // ─── Cancel Ticket ────────────────────────────────────────────────────────────
-function CancelTicket({ user, navigate, showToast }) {
-  const [step, setStep] = useState("pnr"); // pnr | otp | done
-  const [pnr, setPnr] = useState("");
+function CancelTicket({ user, navigate, showToast, context }) {
+  const [step, setStep] = useState("pnr"); // pnr | select | refund | otp | done
+  const [pnr, setPnr] = useState(context?.pnr || "");
+  const [booking, setBooking] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [refundAmount, setRefundAmount] = useState(0);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [cancelled, setCancelled] = useState(null);
+  const [result, setResult] = useState(null);
 
-  async function handleCheckPNR(e) {
-    e.preventDefault();
-    if (!pnr.trim()) { showToast("Enter a PNR number.", "error"); return; }
+  // If we arrived here with a PNR already (from My Bookings), fetch it immediately
+  useEffect(() => {
+    if (context?.pnr) {
+      handleFetchPNR(null, context.pnr);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleFetchPNR(e, prefilledPnr) {
+    if (e) e.preventDefault();
+    const targetPnr = (prefilledPnr || pnr).trim().toUpperCase();
+    if (!targetPnr) { showToast("Enter a PNR number.", "error"); return; }
     setLoading(true);
     try {
-      await sendOTP(pnr);
+      const data = await Api.getBookingByPnr(targetPnr);
+      const activePassengers = data.passengers.filter(p => p.status === "CONFIRMED");
+      if (activePassengers.length === 0) {
+        showToast("All passengers on this PNR are already cancelled.", "error");
+        setLoading(false);
+        return;
+      }
+      setBooking(data);
+      setPnr(targetPnr);
+      setStep("select");
+    } catch (err) {
+      showToast(err.response?.data?.error || "PNR not found.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleSelect(passengerId) {
+    setSelectedIds(prev =>
+      prev.includes(passengerId)
+        ? prev.filter(id => id !== passengerId)
+        : [...prev, passengerId]
+    );
+  }
+
+  async function handleCalculateRefund() {
+    if (selectedIds.length === 0) {
+      showToast("Select at least one passenger to cancel.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await Api.getRefundPreview(pnr, selectedIds);
+      setRefundAmount(data.refundAmount);
+      setStep("refund");
+    } catch (err) {
+      showToast(err.response?.data?.error || "Could not calculate refund.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleConfirmAndSendOtp() {
+    setLoading(true);
+    try {
+      await Api.sendCancelOTP(pnr);
       setStep("otp");
+      showToast("OTP sent to your registered email.", "success");
     } catch {
       showToast("Failed to send OTP. Try again.", "error");
     } finally {
@@ -1508,57 +1702,137 @@ function CancelTicket({ user, navigate, showToast }) {
     }
   }
 
-  async function handleVerify(e) {
+  async function handleVerifyAndCancel(e) {
     e.preventDefault();
     const code = otp.join("");
     if (code.length < 6) { showToast("Enter the complete 6-digit OTP.", "error"); return; }
     setLoading(true);
     try {
-      const booking = await verifyOTPAndCancel(pnr.trim().toUpperCase(), user.email, code);
-      setCancelled(booking);
+      const data = await Api.cancelWithOTP(pnr, code, selectedIds);
+      setResult(data);
       setStep("done");
-      showToast("Ticket cancelled successfully.", "success");
+      showToast("Cancellation successful.", "success");
     } catch (err) {
-      showToast(err.message || "Cancellation failed.", "error");
+      showToast(err.response?.data?.error || "Cancellation failed.", "error");
     } finally {
       setLoading(false);
     }
   }
 
+  const selectedPassengerNames = booking?.passengers
+    .filter(p => selectedIds.includes(p.passengerId))
+    .map(p => p.passengerName) || [];
+
   return (
     <div className="page-sm" style={{ paddingTop: "2.5rem" }}>
-      <button className="back-link" onClick={() => navigate("home")}>← Back to home</button>
+      <button className="back-link" onClick={() => navigate("bookings")}>← Back to my bookings</button>
 
       <div className="auth-card">
+
+        {/* STEP 1: Enter PNR */}
         {step === "pnr" && (
           <>
             <div className="auth-logo">
-              <h2>🎫 Cancel Ticket</h2>
-              <p>Enter your PNR to initiate cancellation</p>
+              <h2>🎫 Cancel Booking</h2>
+              <p>Enter your PNR to view passengers</p>
             </div>
-            <form onSubmit={handleCheckPNR}>
+            <form onSubmit={handleFetchPNR}>
               <div className="form-field">
                 <label>PNR Number</label>
                 <input type="text" placeholder="e.g. PNR4F7X2A" value={pnr} onChange={e => setPnr(e.target.value.toUpperCase())} style={{ fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }} />
               </div>
-              <div className="form-field">
-                <label>Registered Email</label>
-                <input type="email" value={user?.email} readOnly style={{ background: "#f8fafc", color: "#64748b" }} />
-              </div>
               <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? "Sending OTP…" : "Send OTP to Email"}
+                {loading ? "Looking up…" : "Find Booking"}
               </button>
             </form>
           </>
         )}
 
+        {/* STEP 2: Select Passengers */}
+        {step === "select" && booking && (
+          <>
+            <div className="auth-logo">
+              <h2>👥 Select Passengers</h2>
+              <p>PNR: <strong style={{ fontFamily: "monospace" }}>{pnr}</strong></p>
+            </div>
+
+            <div style={{ marginBottom: "1.25rem" }}>
+              {booking.passengers.map(p => {
+                const isCancelled = p.status === "CANCELLED";
+                return (
+                  <label
+                    key={p.passengerId}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "12px 14px", border: "1.5px solid #e5e9f2", borderRadius: 10,
+                      marginBottom: 8, cursor: isCancelled ? "not-allowed" : "pointer",
+                      opacity: isCancelled ? 0.5 : 1,
+                      background: selectedIds.includes(p.passengerId) ? "#dbeafe" : "#fff"
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      disabled={isCancelled}
+                      checked={selectedIds.includes(p.passengerId)}
+                      onChange={() => toggleSelect(p.passengerId)}
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{p.passengerName}</div>
+                      <div style={{ fontSize: "0.8125rem", color: "#64748b" }}>Seat {p.seatNumber}</div>
+                    </div>
+                    <span className={`badge ${isCancelled ? "badge-red" : "badge-green"}`}>{p.status}</span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <button className="submit-btn" onClick={handleCalculateRefund} disabled={loading}>
+              {loading ? "Calculating…" : `Continue with ${selectedIds.length} passenger${selectedIds.length !== 1 ? "s" : ""} →`}
+            </button>
+            <button type="button" onClick={() => setStep("pnr")} className="nav-btn" style={{ width: "100%", marginTop: 8, fontSize: "0.9375rem" }}>
+              ← Change PNR
+            </button>
+          </>
+        )}
+
+        {/* STEP 3: Show Refund Amount */}
+        {step === "refund" && (
+          <>
+            <div className="auth-logo">
+              <h2>💰 Refund Summary</h2>
+              <p>PNR: <strong style={{ fontFamily: "monospace" }}>{pnr}</strong></p>
+            </div>
+
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "1.25rem", marginBottom: "1.5rem" }}>
+              <div style={{ fontSize: "0.8125rem", color: "#64748b", marginBottom: 8 }}>Cancelling:</div>
+              {selectedPassengerNames.map(name => (
+                <div key={name} style={{ fontWeight: 600, fontSize: "0.9375rem", padding: "4px 0" }}>{name}</div>
+              ))}
+              <div className="divider" />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.9375rem", color: "#374151", fontWeight: 600 }}>Refund Amount</span>
+                <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "#16a34a" }}>{fmt(refundAmount)}</span>
+              </div>
+            </div>
+
+            <button className="submit-btn" onClick={handleConfirmAndSendOtp} disabled={loading}>
+              {loading ? "Sending OTP…" : "Confirm & Send OTP"}
+            </button>
+            <button type="button" onClick={() => setStep("select")} className="nav-btn" style={{ width: "100%", marginTop: 8, fontSize: "0.9375rem" }}>
+              ← Back to passenger selection
+            </button>
+          </>
+        )}
+
+        {/* STEP 4: Verify OTP */}
         {step === "otp" && (
           <>
             <div className="auth-logo">
               <h2>🔑 Verify OTP</h2>
               <p>Enter the 6-digit code sent to {user?.email}</p>
             </div>
-            <form onSubmit={handleVerify}>
+            <form onSubmit={handleVerifyAndCancel}>
               <div className="otp-wrap">
                 {otp.map((d, i) => (
                   <input
@@ -1575,33 +1849,88 @@ function CancelTicket({ user, navigate, showToast }) {
                   />
                 ))}
               </div>
-              <p style={{ fontSize: "0.8125rem", color: "#94a3b8", textAlign: "center", marginBottom: "1rem" }}>
-                [Demo] Check the browser console or the alert for your OTP.
-              </p>
               <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? "Verifying…" : "Confirm Cancellation"}
+                {loading ? "Cancelling…" : "Confirm Cancellation"}
               </button>
-              <button type="button" onClick={() => setStep("pnr")} className="nav-btn" style={{ width: "100%", marginTop: 8, fontSize: "0.9375rem" }}>
-                ← Change PNR
+              <button type="button" onClick={() => setStep("refund")} className="nav-btn" style={{ width: "100%", marginTop: 8, fontSize: "0.9375rem" }}>
+                ← Back
               </button>
             </form>
           </>
         )}
 
-        {step === "done" && cancelled && (
+        {/* STEP 5: Done */}
+        {step === "done" && result && (
           <div style={{ textAlign: "center" }}>
-            <div className="success-circle" style={{ background: "#fee2e2" }}>❌</div>
-            <h2 style={{ fontFamily: "Sora, sans-serif", fontWeight: 700, color: "#dc2626", marginBottom: 8 }}>Ticket Cancelled</h2>
-            <p style={{ color: "#64748b", marginBottom: "1.5rem" }}>Your PNR <strong>{cancelled.pnr}</strong> has been cancelled. The seat is now available for other passengers.</p>
-            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "1rem", textAlign: "left", fontSize: "0.875rem", color: "#374151", marginBottom: "1.5rem" }}>
-              <div style={{ marginBottom: 6 }}><strong>Flight:</strong> {cancelled.flightNumber}</div>
-              <div style={{ marginBottom: 6 }}><strong>Route:</strong> {cancelled.source} → {cancelled.destination}</div>
-              <div><strong>Seat:</strong> {cancelled.seatNumber}</div>
+            <div className="success-circle" style={{ background: result.status === "CANCELLED" ? "#fee2e2" : "#dcfce7" }}>
+              {result.status === "CANCELLED" ? "❌" : "✅"}
             </div>
-            <button className="submit-btn" onClick={() => navigate("home")}>Book a New Flight</button>
+            <h2 style={{ fontFamily: "Sora, sans-serif", fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>
+              Cancellation Successful
+            </h2>
+            <p style={{ color: "#64748b", marginBottom: "1.5rem" }}>
+              PNR <strong style={{ fontFamily: "monospace" }}>{result.pnr}</strong> updated.
+            </p>
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "1rem", textAlign: "left", fontSize: "0.875rem", color: "#374151", marginBottom: "1.5rem" }}>
+              <div style={{ marginBottom: 6 }}><strong>Refund Amount:</strong> {fmt(result.refundAmount)} Refunded</div>
+              <div><strong>Booking Status:</strong> {result.status}</div>
+            </div>
+            <button className="submit-btn" onClick={() => navigate("bookings")}>View My Bookings</button>
           </div>
         )}
+
       </div>
+    </div>
+  );
+}
+function PassengerDetails({ context, user, navigate, showToast }) {
+  const flight = context.flight;
+  const seats = context.selectedSeats;
+  const [names, setNames] = useState(seats.map(() => ""));
+
+  function updateName(idx, val) {
+    const next = [...names];
+    next[idx] = val;
+    setNames(next);
+  }
+
+  function proceed() {
+    if (names.some(n => !n.trim())) {
+      showToast("Please enter a name for every passenger.", "error");
+      return;
+    }
+    const passengers = seats.map((seat, i) => ({ seatNumber: seat, passengerName: names[i].trim() }));
+    navigate("payment", { ...context, passengers });
+  }
+
+  return (
+    <div className="page" style={{ maxWidth: 600 }}>
+      <button className="back-link" onClick={() => navigate("seats")}>← Back to seat selection</button>
+
+      <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.25rem", color: "#1a1a2e" }}>
+        Passenger Details
+      </h2>
+      <p style={{ color: "#64748b", marginBottom: "1.5rem", fontSize: "0.9375rem" }}>
+        {flight.source} → {flight.destination} · {fmtDate(flight.journeyDate)}
+      </p>
+
+      <div className="payment-card">
+        {seats.map((seat, idx) => (
+          <div className="form-field" key={seat}>
+            <label>Passenger {idx + 1} — Seat {seat}</label>
+            <input
+              type="text"
+              placeholder="Full name as per ID"
+              value={names[idx]}
+              onChange={e => updateName(idx, e.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <button className="submit-btn" onClick={proceed}>
+        Continue to Payment →
+      </button>
     </div>
   );
 }
