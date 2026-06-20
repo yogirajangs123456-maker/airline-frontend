@@ -429,6 +429,10 @@ input::placeholder {
     margin-bottom: 1rem;
   }
   .payment-card h3 { font-size: 1rem; font-weight: 600; color: #1a1a2e; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
+  .payment-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+  .expiry-cvv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .payment-summary-col { position: sticky; top: 80px; }
+  .seat-col-label { width: 44px; text-align: center; font-size: 0.7rem; font-weight: 700; color: #94a3b8; flex-shrink: 0; }
   .card-number-input {
     font-family: 'Courier New', monospace;
     letter-spacing: 0.1em;
@@ -700,6 +704,13 @@ input::placeholder {
     /* OTP input */
     .otp-wrap { gap: 6px; }
     .otp-digit { width: 38px; height: 48px; font-size: 1.25rem; }
+    .payment-grid { grid-template-columns: 1fr; }
+    .payment-summary-col { position: static; }
+    .expiry-cvv-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seat-col-label { width: 34px; font-size: 0.6rem; }
+    .nav-user span { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .booking-item > div:last-child { display: flex; flex-direction: row; gap: 8px; }
+    .booking-item .book-btn, .booking-item .cancel-btn { flex: 1; text-align: center; }
 
     /* Cancel wizard passenger rows */
     .auth-card label { padding: 10px 12px; }
@@ -1330,7 +1341,7 @@ function SeatSelection({ context, user, navigate, showToast }) {
               {COLS.map((c, i) => (
                 <>
                   {i === 3 && <div className="seat-aisle" key="aisle-lbl" />}
-                  <div key={c} style={{ width: 44, textAlign: "center", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8" }}>{c}</div>
+                  <div key={c} className="seat-col-label">{c}</div>
                 </>
               ))}
             </div>
@@ -1431,7 +1442,7 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
     <div className="page" style={{ maxWidth: 700 }}>
       <button className="back-link" onClick={() => navigate("passengers")}>← Back to passenger details</button>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1.5rem", alignItems: "start" }}>
+      <div className="payment-grid">
         <div>
           <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.25rem", color: "#1a1a2e" }}>💳 Secure Payment</h2>
 
@@ -1452,7 +1463,7 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
                   <label>Card Number</label>
                   <input className="card-number-input" type="text" value={cardNumber} onChange={e => setCardNumber(formatCardNumber(e.target.value))} placeholder="1234 5678 9012 3456" maxLength={19} />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="expiry-cvv-grid">
                   <div className="form-field">
                     <label>Expiry (MM/YY)</label>
                     <input type="text" value={expiry} onChange={e => setExpiry(formatExpiry(e.target.value))} placeholder="08/27" maxLength={5} />
@@ -1474,7 +1485,7 @@ function PaymentPage({ context, user, navigate, showToast, setBookingResult }) {
           )}
         </div>
 
-        <div style={{ position: "sticky", top: 80 }}>
+        <div className="payment-summary-col">
           <div className="pay-summary">
             <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem", color: "#1a1a2e" }}>Booking Summary</div>
             <div className="pay-summary-row"><span>Flight</span><span>{flight.flightNumber}</span></div>
