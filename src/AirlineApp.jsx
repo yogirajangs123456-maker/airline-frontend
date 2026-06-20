@@ -645,6 +645,16 @@ input::placeholder {
 
     /* Generic page padding */
     .page, .page-sm { padding: 1rem; }
+    .section-heading {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .section-heading > div:last-child {
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    .section-heading h2 { font-size: 1.25rem; }
 
     /* Features & popular routes */
     .features { padding: 0 1rem 2rem; margin-top: -1rem; }
@@ -653,9 +663,34 @@ input::placeholder {
     /* Flight result cards */
     .flight-card {
       grid-template-columns: 1fr;
-      gap: 12px;
+      gap: 10px;
       padding: 1rem;
     }
+    .airline-logo { width: 36px; height: 36px; font-size: 0.625rem; }
+    .flight-route {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .flight-route .route-line {
+      flex-direction: row;
+      order: 2;
+    }
+    .flight-route > .route-city:first-child { order: 1; }
+    .flight-route > .route-city:last-child { order: 3; text-align: right; }
+    .route-time { font-size: 1.125rem; }
+    .flight-meta, .flight-price {
+      text-align: left;
+    }
+    .flight-price {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .price-amount { font-size: 1.25rem; }
+    .book-btn { margin-top: 0; white-space: nowrap; }
     .airline-logo { width: 40px; height: 40px; font-size: 0.6875rem; }
     .flight-route { flex-wrap: wrap; gap: 0.5rem; }
     .route-time { font-size: 1.125rem; }
