@@ -663,48 +663,68 @@ input::placeholder {
     /* Flight result cards */
     .flight-card {
       grid-template-columns: 1fr;
-      gap: 10px;
-      padding: 1rem;
-    }
-    .airline-logo { width: 36px; height: 36px; font-size: 0.625rem; }
-    .flight-route {
-      flex-direction: column;
-      align-items: stretch;
+      grid-template-areas:
+        "logo name"
+        "route route"
+        "meta price";
       gap: 8px;
+      padding: 0.875rem;
     }
-    .flight-route .route-line {
+    .airline-logo {
+      width: 32px;
+      height: 32px;
+      font-size: 0.5625rem;
+      grid-area: logo;
+    }
+    .flight-card-main {
+      grid-area: route;
+    }
+    .flight-route {
       flex-direction: row;
-      order: 2;
-    }
-    .flight-route > .route-city:first-child { order: 1; }
-    .flight-route > .route-city:last-child { order: 3; text-align: right; }
-    .route-time { font-size: 1.125rem; }
-    .flight-meta, .flight-price {
-      text-align: left;
-    }
-    .flight-price {
-      display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 4px;
     }
-    .price-amount { font-size: 1.25rem; }
-    .book-btn { margin-top: 0; white-space: nowrap; }
-    .airline-logo { width: 40px; height: 40px; font-size: 0.6875rem; }
-    .flight-route { flex-wrap: wrap; gap: 0.5rem; }
-    .route-time { font-size: 1.125rem; }
-    .flight-meta, .flight-price { text-align: left; }
-    .flight-price { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .book-btn { margin-top: 0; }
+    .route-city { flex-shrink: 0; }
+    .route-time { font-size: 1rem; }
+    .route-code { font-size: 0.6875rem; }
+    .route-line { gap: 2px; }
+    .route-duration { font-size: 0.625rem; }
+    .flight-meta {
+      text-align: left;
+      grid-area: meta;
+    }
+    .flight-class { font-size: 0.6875rem; margin-bottom: 2px; }
+    .seats-left { font-size: 0.6875rem; }
+    .flight-price {
+      grid-area: price;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .price-amount { font-size: 1.0625rem; }
+    .price-label { display: none; }
+    .book-btn {
+      margin-top: 0;
+      padding: 6px 14px;
+      font-size: 0.8125rem;
+    }
 
     /* Seat map */
-    .seat-map-wrap { padding: 1.25rem; }
-    .plane-body { padding: 1.25rem 0.75rem 1.5rem; }
-    .seat-box { width: 36px; height: 36px; font-size: 0.65rem; }
-    .seat-row { gap: 5px; }
-    .seat-aisle { width: 10px; }
-    .seat-legend { gap: 10px; font-size: 0.75rem; }
+    .seat-map-wrap { padding: 1.25rem 0.5rem; }
+    .plane-body {
+      max-width: 100%;
+      width: fit-content;
+      margin: 0 auto;
+      padding: 1.25rem 0.5rem 1.5rem;
+    }
+    .seat-box { width: 34px; height: 34px; font-size: 0.625rem; }
+    .seat-row { gap: 5px; justify-content: center; }
+    .seat-row-num { width: 18px; font-size: 0.6875rem; flex-shrink: 0; }
+    .seat-aisle { width: 10px; flex-shrink: 0; }
+    .seat-col-label { width: 34px; font-size: 0.6rem; flex-shrink: 0; }
+    .seat-legend { gap: 10px; font-size: 0.6875rem; }
     .legend-dot { width: 14px; height: 14px; }
 
     /* Auth cards (Login/Signup/Cancel wizard) */
@@ -1233,7 +1253,7 @@ function FlightResults({ context, user, navigate, showToast }) {
                   <br />
                   <span style={{ fontSize: "0.6rem", fontWeight: 500 }}>{flight.flightNumber}</span>
                 </div>
-                <div>
+                <div className="flight-card-main">
                   <div style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#1a1a2e", marginBottom: 2 }}>{brand.name}</div>
                   <div className="flight-route">
                     <div className="route-city">
