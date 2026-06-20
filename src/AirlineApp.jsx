@@ -595,42 +595,126 @@ input::placeholder {
   .success-animation { text-align: center; padding: 2rem; }
   .success-circle { width: 80px; height: 80px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem; }
 
+  /* ── Responsive: Tablet & Mobile ── */
   @media (max-width: 768px) {
-  .search-grid { grid-template-columns: 1fr 1fr; }
-  .feature-grid { grid-template-columns: 1fr; }
-  .flight-card { grid-template-columns: 1fr; }
-  .ticket-details { grid-template-columns: repeat(2, 1fr); }
+    html, body { font-size: 15px; }
 
-  .nav {
-    padding: 0 1rem;
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 64px;
+    /* Nav */
+    .nav {
+      padding: 0 1rem;
+      height: auto;
+      min-height: 56px;
+      flex-wrap: wrap;
+      row-gap: 8px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+    .nav-logo { font-size: 1.15rem; }
+    .nav-links {
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .nav-btn {
+      padding: 6px 12px;
+      font-size: 0.8125rem;
+    }
+    .nav-user { gap: 6px; font-size: 0.8125rem; }
+    .avatar { width: 30px; height: 30px; font-size: 0.75rem; }
+
+    /* Hero */
+    .hero { padding: 2rem 1rem 1.75rem; }
+    .hero h1 { font-size: 1.75rem; }
+    .hero p { font-size: 0.9375rem; margin-bottom: 1.5rem; }
+    .hero-badge { font-size: 0.6875rem; padding: 3px 10px; }
+
+    /* Search card */
+    .search-card { padding: 1.25rem; max-width: 100%; border-radius: 12px; }
+    .search-tabs { width: 100%; }
+    .search-tab { flex: 1; text-align: center; padding: 8px 10px; font-size: 0.8125rem; }
+    .search-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .search-btn { width: 100%; }
+
+    /* Generic page padding */
+    .page, .page-sm { padding: 1rem; }
+
+    /* Features & popular routes */
+    .features { padding: 0 1rem 2rem; margin-top: -1rem; }
+    .feature-grid { grid-template-columns: 1fr; gap: 12px; }
+
+    /* Flight result cards */
+    .flight-card {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 1rem;
+    }
+    .airline-logo { width: 40px; height: 40px; font-size: 0.6875rem; }
+    .flight-route { flex-wrap: wrap; gap: 0.5rem; }
+    .route-time { font-size: 1.125rem; }
+    .flight-meta, .flight-price { text-align: left; }
+    .flight-price { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .book-btn { margin-top: 0; }
+
+    /* Seat map */
+    .seat-map-wrap { padding: 1.25rem; }
+    .plane-body { padding: 1.25rem 0.75rem 1.5rem; }
+    .seat-box { width: 36px; height: 36px; font-size: 0.65rem; }
+    .seat-row { gap: 5px; }
+    .seat-aisle { width: 10px; }
+    .seat-legend { gap: 10px; font-size: 0.75rem; }
+    .legend-dot { width: 14px; height: 14px; }
+
+    /* Auth cards (Login/Signup/Cancel wizard) */
+    .auth-card { padding: 1.5rem; border-radius: 14px; }
+    .auth-logo h2 { font-size: 1.375rem; }
+
+    /* Payment page */
+    .payment-card { padding: 1.25rem; }
+    .pay-summary { padding: 1rem; }
+    .pay-summary-row { font-size: 0.8125rem; flex-wrap: wrap; gap: 4px; }
+
+    /* Ticket preview */
+    .ticket-preview { padding: 1.25rem; border-radius: 14px; }
+    .ticket-route { gap: 0.5rem; }
+    .ticket-city { font-size: 1.5rem; }
+    .ticket-details { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .ticket-divider::before, .ticket-divider::after { display: none; }
+
+    /* My Bookings */
+    .booking-item {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 1rem;
+    }
+    .booking-item > div:last-child {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .booking-route { font-size: 1rem; }
+    .booking-meta { font-size: 0.75rem; }
+
+    /* OTP input */
+    .otp-wrap { gap: 6px; }
+    .otp-digit { width: 38px; height: 48px; font-size: 1.25rem; }
+
+    /* Cancel wizard passenger rows */
+    .auth-card label { padding: 10px 12px; }
+
+    /* Toast */
+    .toast { left: 16px; right: 16px; top: 70px; max-width: none; }
   }
-  .nav-links {
-    flex-wrap: wrap;
-    gap: 6px;
-    justify-content: flex-end;
-    padding: 8px 0;
+
+  /* ── Very small phones ── */
+  @media (max-width: 380px) {
+    .hero h1 { font-size: 1.5rem; }
+    .otp-digit { width: 32px; height: 42px; font-size: 1.1rem; }
+    .seat-box { width: 32px; height: 32px; font-size: 0.6rem; }
+    .nav-logo { font-size: 1rem; }
   }
-  .hero {
-    padding: 2.5rem 1rem 2rem;
-  }
-  .search-card {
-    padding: 1.25rem;
-    max-width: 100%;
-    margin: 0;
-  }
-  .page, .page-sm {
-    padding: 1rem;
-  }
-  .booking-item {
-    grid-template-columns: 1fr;
-  }
-  .pay-summary-row {
-    font-size: 0.8125rem;
-  }
-}
 `;
 
 // ─── Airline brand map ────────────────────────────────────────────────────────
