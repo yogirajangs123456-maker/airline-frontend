@@ -376,7 +376,7 @@ function AdminShell({ admin, onLogout }) {
                 </div>
 
                 {activePage === "dashboard" && <AdminDashboard />}
-                {activePage === "flights" && <AdminPlaceholder title="Flight" />}
+                {activePage === "flights" && <AdminFlightManagement />}
                 {activePage === "reservations" && <AdminPlaceholder title="Reservation" />}
                 {activePage === "users" && <AdminPlaceholder title="User" />}
                 {activePage === "analytics" && <AdminPlaceholder title="Analytics" />}
@@ -416,4 +416,248 @@ export default function AdminApp() {
             )}
         </>
     );
+}
+
+function computeFlightStatus(flight) {
+    const now = new Date();
+    const departure = new Date(`${flight.journeyDate}T${flight.departureTime}`);
+    const arrival = new Date(`${flight.journeyDate}T${flight.arrivalTime}`);
+    if (!flight.active) return "CANCELLED";
+    if (now < departure) return "SCHEDULED";
+    if (now < arrival) return "DEPARTED";
+    return "COMPLETED";
+}
+
+function AdminFlightManagement() {
+    const [flights, setFlights] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState({ source: "", destination: "", date: "", flightNumber: "" });
+    const [showForm, setShowForm] = useState(false);
+    const [editingFlight, setEditingFlight] = useState(null);
+
+    function loadAll() {
+        setLoading(true);
+        AdminApi.getAllAdminFlights().then(setFlights).finally(() => setLoading(false));
+    }
+
+    useEffect(() => { loadAll(); }, []);
+
+    function handleSearch() {
+        const params = {};
+        if (filters.source) params.source = filters.source;
+        if (filters.destination) params.destination = filters.destination;
+        if (filters.date) params.date = filters.date;
+        if (filters.flightNumber) params.flightNumber = filters.flightNumber;
+
+        setLoading(true);
+        AdminApi.searchAdminFlights(params).then(setFlights).finally(() => setLoading(false));
+    }
+
+    function clearFilters() {
+        setFilters({ source: "", destination: "", date: "", flightNumber: "" });
+        loadAll();
+    }
+
+    function openAddForm() {
+        setEditingFlight(null);
+        setShowForm(true);
+    }
+
+    function openEditForm(flight) {
+        setEditingFlight(flight);
+        setShowForm(true);
+    }
+
+    async function handleDelete(id) {
+        if (!window.confirm("Permanently delete this flight? This cannot be undone.")) return;
+        try {
+            await AdminApi.deleteFlight(id);
+            loadAll();
+        } catch (err) {
+            alert(err.response?.data?.error || "Could not delete flight (it may have existing bookings).");
+        }
+    }
+
+    async function handleToggleActive(flight) {
+        if (flight.active) {
+            await AdminApi.deactivateFlight(flight.flightId);
+        } else {
+            await AdminApi.activateFlight(flight.flightId);
+        }
+        loadAll();
+    }
+
+    return (
+        <div>
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "1.25rem", marginBottom: "1.5rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+                    <input placeholder="Source" value={filters.source} onChange={e => setFilters({ ...filters, source: e.target.value })} style={inputStyle} />
+                    <input placeholder="Destination" value={filters.destination} onChange={e => setFilters({ ...filters, destination: e.target.value })} style={inputStyle} />
+                    <input type="date" value={filters.date} onChange={e => setFilters({ ...filters, date: e.target.value })} style={inputStyle} />
+                    <input placeholder="Flight Number" value={filters.flightNumber} onChange={e => setFilters({ ...filters, flightNumber: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={handleSearch} style={btnPrimary}>Search</button>
+                    <button onClick={clearFilters} style={btnSecondary}>Clear</button>
+                    <div style={{ flex: 1 }} />
+                    <button onClick={openAddForm} style={btnPrimary}>+ Add Flight</button>
+                </div>
+            </div>
+
+            {loading ? <p style={{ color: "#94a3b8" }}>Loading flights…</p> : (
+                <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                        <thead>
+                            <tr>
+                                {["Flight No.", "Source", "Destination", "Date", "Dep.", "Arr.", "Price", "Seats", "Status", "Actions"].map(h => (
+                                    <th key={h} style={thStyle}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {flights.map(f => {
+                                const status = computeFlightStatus(f);
+                                return (
+                                    <tr key={f.flightId} style={{ borderBottom: "1px solid #334155" }}>
+                                        <td style={tdStyle}>{f.flightNumber}</td>
+                                        <td style={tdStyle}>{f.source}</td>
+                                        <td style={tdStyle}>{f.destination}</td>
+                                        <td style={tdStyle}>{f.journeyDate}</td>
+                                        <td style={tdStyle}>{f.departureTime}</td>
+                                        <td style={tdStyle}>{f.arrivalTime}</td>
+                                        <td style={tdStyle}>{fmt(f.price)}</td>
+                                        <td style={tdStyle}>{f.availableSeats}/{f.totalSeats}</td>
+                                        <td style={tdStyle}>
+                                            <span style={statusBadgeStyle(status)}>{status}</span>
+                                        </td>
+                                        <td style={tdStyle}>
+                                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                                <button onClick={() => openEditForm(f)} style={btnTiny}>Edit</button>
+                                                <button onClick={() => handleToggleActive(f)} style={btnTiny}>
+                                                    {f.active ? "Deactivate" : "Activate"}
+                                                </button>
+                                                <button onClick={() => handleDelete(f.flightId)} style={btnTinyDanger}>Delete</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {showForm && (
+                <FlightFormModal
+                    flight={editingFlight}
+                    onClose={() => setShowForm(false)}
+                    onSaved={() => { setShowForm(false); loadAll(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+function FlightFormModal({ flight, onClose, onSaved }) {
+    const [form, setForm] = useState(flight ? {
+        airlineCode: flight.airlineCode, airlineName: flight.airlineName,
+        flightNumber: flight.flightNumber, source: flight.source, destination: flight.destination,
+        departureTime: flight.departureTime, arrivalTime: flight.arrivalTime,
+        journeyDate: flight.journeyDate, price: flight.price, totalSeats: flight.totalSeats,
+        duration: flight.duration || ""
+    } : {
+        airlineCode: "", airlineName: "", flightNumber: "", source: "", destination: "",
+        departureTime: "", arrivalTime: "", journeyDate: "", price: "", totalSeats: "", duration: ""
+    });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    function update(field, val) {
+        setForm({ ...form, [field]: val });
+    }
+
+    async function handleSave() {
+        setError("");
+        setSaving(true);
+        try {
+            const payload = { ...form, price: parseFloat(form.price), totalSeats: parseInt(form.totalSeats) };
+            if (flight) {
+                await AdminApi.updateFlight(flight.flightId, payload);
+            } else {
+                await AdminApi.createFlight(payload);
+            }
+            onSaved();
+        } catch (err) {
+            setError(err.response?.data?.error || "Failed to save flight.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div style={modalOverlayStyle}>
+            <div style={modalCardStyle}>
+                <h2 style={{ color: "#fff", marginBottom: 16, fontFamily: "Sora, sans-serif" }}>
+                    {flight ? "Edit Flight" : "Add Flight"}
+                </h2>
+                {error && <div className="admin-error">{error}</div>}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <FormField label="Airline Code" value={form.airlineCode} onChange={v => update("airlineCode", v)} />
+                    <FormField label="Airline Name" value={form.airlineName} onChange={v => update("airlineName", v)} />
+                    <FormField label="Flight Number" value={form.flightNumber} onChange={v => update("flightNumber", v)} />
+                    <FormField label="Duration (e.g. 2h 10m)" value={form.duration} onChange={v => update("duration", v)} />
+                    <FormField label="Source" value={form.source} onChange={v => update("source", v)} />
+                    <FormField label="Destination" value={form.destination} onChange={v => update("destination", v)} />
+                    <FormField label="Journey Date" type="date" value={form.journeyDate} onChange={v => update("journeyDate", v)} />
+                    <FormField label="Price" type="number" value={form.price} onChange={v => update("price", v)} />
+                    <FormField label="Departure Time" type="time" value={form.departureTime} onChange={v => update("departureTime", v)} />
+                    <FormField label="Arrival Time" type="time" value={form.arrivalTime} onChange={v => update("arrivalTime", v)} />
+                    <FormField label="Total Seats" type="number" value={form.totalSeats} onChange={v => update("totalSeats", v)} />
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                    <button onClick={handleSave} disabled={saving} style={btnPrimary}>
+                        {saving ? "Saving…" : "Save Flight"}
+                    </button>
+                    <button onClick={onClose} style={btnSecondary}>Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FormField({ label, value, onChange, type = "text" }) {
+    return (
+        <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: 4 }}>{label}</label>
+            <input
+                type={type}
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                style={inputStyle}
+            />
+        </div>
+    );
+}
+
+// ── Shared inline styles for admin tables/forms ──
+const inputStyle = { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1.5px solid #334155", fontSize: "0.875rem" };
+const btnPrimary = { padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.875rem", fontWeight: 600 };
+const btnSecondary = { padding: "8px 16px", background: "#334155", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.875rem", fontWeight: 600 };
+const btnTiny = { padding: "5px 10px", background: "#334155", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: "0.75rem" };
+const btnTinyDanger = { padding: "5px 10px", background: "#7f1d1d", color: "#fecaca", border: "none", borderRadius: 5, cursor: "pointer", fontSize: "0.75rem" };
+const tableStyle = { width: "100%", borderCollapse: "collapse", background: "#1e293b", borderRadius: 8 };
+const thStyle = { textAlign: "left", padding: "10px 12px", fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase", borderBottom: "1px solid #334155" };
+const tdStyle = { padding: "10px 12px", fontSize: "0.875rem", color: "#e2e8f0" };
+const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem" };
+const modalCardStyle = { background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "1.5rem", maxWidth: 600, width: "100%", maxHeight: "90vh", overflowY: "auto" };
+
+function statusBadgeStyle(status) {
+    const colors = {
+        SCHEDULED: { bg: "#1e3a5f", fg: "#60a5fa" },
+        DEPARTED: { bg: "#3f2d1e", fg: "#fbbf24" },
+        COMPLETED: { bg: "#1e3a2e", fg: "#4ade80" },
+        CANCELLED: { bg: "#3f1e1e", fg: "#f87171" },
+    };
+    const c = colors[status] || colors.SCHEDULED;
+    return { background: c.bg, color: c.fg, padding: "3px 10px", borderRadius: 12, fontSize: "0.6875rem", fontWeight: 700 };
 }

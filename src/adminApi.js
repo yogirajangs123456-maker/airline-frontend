@@ -28,3 +28,38 @@ export function getDashboardSummary() {
     return axios.get(`${API}/admin/dashboard/summary`, adminAuthHeader())
         .then(res => res.data);
 }
+
+export function searchAdminFlights(params) {
+    return axios.get(`${API}/admin/flights/search`, { params, ...adminAuthHeader() })
+        .then(res => res.data);
+}
+
+export function getAllAdminFlights() {
+    return axios.get(`${API}/admin/flights`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function createFlight(flight) {
+    return axios.post(`${API}/admin/flights`, flight, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function updateFlight(id, flight) {
+    return axios.put(`${API}/admin/flights/${id}`, flight, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function deleteFlight(id) {
+    return axios.delete(`${API}/admin/flights/${id}`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function deactivateFlight(id) {
+    return axios.patch(`${API}/admin/flights/${id}/deactivate`, {}, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function activateFlight(id) {
+    return axios.patch(`${API}/admin/flights/${id}/activate`, {}, adminAuthHeader())
+        .then(res => res.data);
+}
