@@ -377,7 +377,7 @@ function AdminShell({ admin, onLogout }) {
 
                 {activePage === "dashboard" && <AdminDashboard />}
                 {activePage === "flights" && <AdminFlightManagement />}
-                {activePage === "reservations" && <AdminPlaceholder title="Reservation" />}
+                {activePage === "reservations" && <AdminReservationManagement />}
                 {activePage === "users" && <AdminPlaceholder title="User" />}
                 {activePage === "analytics" && <AdminPlaceholder title="Analytics" />}
             </div>
@@ -660,4 +660,121 @@ function statusBadgeStyle(status) {
     };
     const c = colors[status] || colors.SCHEDULED;
     return { background: c.bg, color: c.fg, padding: "3px 10px", borderRadius: 12, fontSize: "0.6875rem", fontWeight: 700 };
+}
+
+function AdminReservationManagement() {
+    const [reservations, setReservations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState({ pnr: "", passengerName: "", flightNumber: "", email: "", bookingDate: "" });
+    const [expandedPnr, setExpandedPnr] = useState(null);
+
+    function loadAll() {
+        setLoading(true);
+        AdminApi.getAllAdminReservations().then(setReservations).finally(() => setLoading(false));
+    }
+
+    useEffect(() => { loadAll(); }, []);
+
+    function handleSearch() {
+        const params = {};
+        Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
+        setLoading(true);
+        AdminApi.searchAdminReservations(params).then(setReservations).finally(() => setLoading(false));
+    }
+
+    function clearFilters() {
+        setFilters({ pnr: "", passengerName: "", flightNumber: "", email: "", bookingDate: "" });
+        loadAll();
+    }
+
+    return (
+        <div>
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "1.25rem", marginBottom: "1.5rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+                    <input placeholder="PNR" value={filters.pnr} onChange={e => setFilters({ ...filters, pnr: e.target.value })} style={inputStyle} />
+                    <input placeholder="Passenger Name" value={filters.passengerName} onChange={e => setFilters({ ...filters, passengerName: e.target.value })} style={inputStyle} />
+                    <input placeholder="Flight Number" value={filters.flightNumber} onChange={e => setFilters({ ...filters, flightNumber: e.target.value })} style={inputStyle} />
+                    <input placeholder="Email" value={filters.email} onChange={e => setFilters({ ...filters, email: e.target.value })} style={inputStyle} />
+                    <input type="date" value={filters.bookingDate} onChange={e => setFilters({ ...filters, bookingDate: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={handleSearch} style={btnPrimary}>Search</button>
+                    <button onClick={clearFilters} style={btnSecondary}>Clear</button>
+                </div>
+            </div>
+
+            {loading ? <p style={{ color: "#94a3b8" }}>Loading reservations…</p> : (
+                reservations.length === 0 ? (
+                    <p style={{ color: "#94a3b8" }}>No reservations found.</p>
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {reservations.map(r => {
+                            const isExpanded = expandedPnr === r.pnr;
+                            return (
+                                <div key={r.pnr} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "1rem 1.25rem" }}>
+                                    <div
+                                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                                        onClick={() => setExpandedPnr(isExpanded ? null : r.pnr)}
+                                    >
+                                        <div>
+                                            <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#60a5fa", marginRight: 12 }}>{r.pnr}</span>
+                                            <span style={{ color: "#e2e8f0" }}>{r.flight?.source} → {r.flight?.destination}</span>
+                                            <span style={{ color: "#94a3b8", marginLeft: 12, fontSize: "0.8125rem" }}>
+                                                {r.flight?.flightNumber} · {r.flight?.journeyDate}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                            <span style={statusBadgeStyle(r.status === "ACTIVE" ? "SCHEDULED" : "CANCELLED")}>{r.status}</span>
+                                            <span style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>{isExpanded ? "▲" : "▼"}</span>
+                                        </div>
+                                    </div>
+
+                                    {isExpanded && (
+                                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #334155" }}>
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 12, fontSize: "0.8125rem" }}>
+                                                <DetailItem label="Customer Email" value={r.user?.email} />
+                                                <DetailItem label="Booked At" value={new Date(r.bookedAt).toLocaleString()} />
+                                                <DetailItem label="Cancelled At" value={r.cancelledAt ? new Date(r.cancelledAt).toLocaleString() : "—"} />
+                                                <DetailItem label="Total Paid" value={fmt(r.totalPrice)} />
+                                                <DetailItem label="Refund Amount" value={r.refundAmount > 0 ? fmt(r.refundAmount) : "—"} />
+                                            </div>
+                                            <table style={{ ...tableStyle, background: "#0f172a" }}>
+                                                <thead>
+                                                    <tr>
+                                                        {["Passenger", "Seat", "Status"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {r.passengers?.map(p => (
+                                                        <tr key={p.passengerId} style={{ borderBottom: "1px solid #334155" }}>
+                                                            <td style={tdStyle}>{p.passengerName}</td>
+                                                            <td style={tdStyle}>{p.seatNumber}</td>
+                                                            <td style={tdStyle}>
+                                                                <span style={statusBadgeStyle(p.status === "CONFIRMED" ? "SCHEDULED" : "CANCELLED")}>
+                                                                    {p.status}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )
+            )}
+        </div>
+    );
+}
+
+function DetailItem({ label, value }) {
+    return (
+        <div>
+            <div style={{ color: "#94a3b8", fontSize: "0.6875rem", textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
+            <div style={{ color: "#e2e8f0", fontWeight: 600 }}>{value || "—"}</div>
+        </div>
+    );
 }

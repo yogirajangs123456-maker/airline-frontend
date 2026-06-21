@@ -63,3 +63,13 @@ export function activateFlight(id) {
     return axios.patch(`${API}/admin/flights/${id}/activate`, {}, adminAuthHeader())
         .then(res => res.data);
 }
+
+export function getAllAdminReservations() {
+    return axios.get(`${API}/admin/reservations`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function searchAdminReservations(params) {
+    return axios.get(`${API}/admin/reservations/search`, { params, ...adminAuthHeader() })
+        .then(res => res.data);
+}
