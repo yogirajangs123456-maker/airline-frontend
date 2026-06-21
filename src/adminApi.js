@@ -23,3 +23,8 @@ export function verifyAdminSession() {
     return axios.get(`${API}/admin/auth/me`, adminAuthHeader())
         .then(res => res.data);
 }
+
+export function getDashboardSummary() {
+    return axios.get(`${API}/admin/dashboard/summary`, adminAuthHeader())
+        .then(res => res.data);
+}
