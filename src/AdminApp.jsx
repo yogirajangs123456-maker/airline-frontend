@@ -378,7 +378,7 @@ function AdminShell({ admin, onLogout }) {
                 {activePage === "dashboard" && <AdminDashboard />}
                 {activePage === "flights" && <AdminFlightManagement />}
                 {activePage === "reservations" && <AdminReservationManagement />}
-                {activePage === "users" && <AdminPlaceholder title="User" />}
+                {activePage === "users" && <AdminUserManagement />}
                 {activePage === "analytics" && <AdminPlaceholder title="Analytics" />}
             </div>
         </div>
@@ -775,6 +775,60 @@ function DetailItem({ label, value }) {
         <div>
             <div style={{ color: "#94a3b8", fontSize: "0.6875rem", textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
             <div style={{ color: "#e2e8f0", fontWeight: 600 }}>{value || "—"}</div>
+        </div>
+    );
+}
+
+function AdminUserManagement() {
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
+
+    useEffect(() => {
+        AdminApi.getAllAdminUsers().then(setUsers).finally(() => setLoading(false));
+    }, []);
+
+    const filtered = users.filter(u =>
+        u.name.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div>
+            <div style={{ marginBottom: "1.25rem" }}>
+                <input
+                    placeholder="Search by name or email…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    style={{ ...inputStyle, maxWidth: 320 }}
+                />
+            </div>
+
+            {loading ? <p style={{ color: "#94a3b8" }}>Loading users…</p> : (
+                <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                        <thead>
+                            <tr>
+                                {["Name", "Email", "Registered", "Total Bookings", "Total Amount Spent"].map(h => (
+                                    <th key={h} style={thStyle}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map(u => (
+                                <tr key={u.id} style={{ borderBottom: "1px solid #334155" }}>
+                                    <td style={tdStyle}>{u.name}</td>
+                                    <td style={tdStyle}>{u.email}</td>
+                                    <td style={tdStyle}>{new Date(u.registrationDate).toLocaleDateString()}</td>
+                                    <td style={tdStyle}>{u.totalBookings}</td>
+                                    <td style={tdStyle}>{fmt(u.totalAmountSpent)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {filtered.length === 0 && <p style={{ color: "#94a3b8", marginTop: 12 }}>No users found.</p>}
+                </div>
+            )}
         </div>
     );
 }

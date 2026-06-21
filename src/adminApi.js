@@ -73,3 +73,8 @@ export function searchAdminReservations(params) {
     return axios.get(`${API}/admin/reservations/search`, { params, ...adminAuthHeader() })
         .then(res => res.data);
 }
+
+export function getAllAdminUsers() {
+    return axios.get(`${API}/admin/users`, adminAuthHeader())
+        .then(res => res.data);
+}
