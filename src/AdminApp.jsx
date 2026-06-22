@@ -379,7 +379,7 @@ function AdminShell({ admin, onLogout }) {
                 {activePage === "flights" && <AdminFlightManagement />}
                 {activePage === "reservations" && <AdminReservationManagement />}
                 {activePage === "users" && <AdminUserManagement />}
-                {activePage === "analytics" && <AdminPlaceholder title="Analytics" />}
+                {activePage === "analytics" && <AdminAnalytics />}
             </div>
         </div>
     );
@@ -829,6 +829,206 @@ function AdminUserManagement() {
                     {filtered.length === 0 && <p style={{ color: "#94a3b8", marginTop: 12 }}>No users found.</p>}
                 </div>
             )}
+        </div>
+    );
+}
+
+function AdminAnalytics() {
+    const [days, setDays] = useState(30);
+    const [revenue, setRevenue] = useState(null);
+    const [routes, setRoutes] = useState(null);
+    const [demand, setDemand] = useState(null);
+    const [peakTravel, setPeakTravel] = useState([]);
+    const [topCustomers, setTopCustomers] = useState([]);
+    const [insights, setInsights] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadAll(days);
+    }, []);
+
+    function loadAll(d) {
+        setLoading(true);
+        Promise.all([
+            AdminApi.getRevenueAnalytics(d),
+            AdminApi.getRouteAnalytics(),
+            AdminApi.getFlightDemandAnalytics(),
+            AdminApi.getPeakTravelAnalytics(),
+            AdminApi.getTopCustomers(),
+            AdminApi.getBusinessInsights(),
+        ]).then(([rev, rt, dm, pt, tc, ins]) => {
+            setRevenue(rev);
+            setRoutes(rt);
+            setDemand(dm);
+            setPeakTravel(pt);
+            setTopCustomers(tc);
+            setInsights(ins);
+        }).finally(() => setLoading(false));
+    }
+
+    function handleDaysChange() {
+        loadAll(days);
+    }
+
+    if (loading) return <p style={{ color: "#94a3b8" }}>Loading analytics…</p>;
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+
+            {/* ── Revenue Analytics ── */}
+            <Section title="Revenue Analytics">
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                    <label style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Number of Days:</label>
+                    <input
+                        type="number"
+                        value={days}
+                        onChange={e => setDays(parseInt(e.target.value) || 1)}
+                        style={{ ...inputStyle, width: 100 }}
+                    />
+                    <button onClick={handleDaysChange} style={btnPrimary}>Apply</button>
+                </div>
+                <div className="admin-cards-grid">
+                    <Card label="Total Revenue" value={fmt(revenue.totalRevenue)} />
+                    <Card label="Total Refunds" value={fmt(revenue.totalRefunds)} cls="negative" />
+                    <Card label="Net Revenue" value={fmt(revenue.netRevenue)} cls="positive" />
+                </div>
+            </Section>
+
+            {/* ── Business Insights ── */}
+            {insights && (
+                <Section title="Business Insights">
+                    <div className="admin-cards-grid">
+                        <InsightCard label="Most Profitable Route" data={insights.mostProfitableRoute}
+                            render={d => d ? `${d.route} — ${fmt(d.revenue)}` : "—"} />
+                        <InsightCard label="Highest Demand Flight" data={insights.highestDemandFlight}
+                            render={d => d ? `${d.flightNumber} — ${d.bookings} bookings` : "—"} />
+                        <InsightCard label="Lowest Occupancy" data={insights.lowestOccupancyRoute}
+                            render={d => d ? `${d.flightNumber} — ${d.occupancyPercent}%` : "—"} />
+                        <InsightCard label="Highest Cancellation Route" data={insights.highestCancellationRoute}
+                            render={d => d ? `${d.route} — ${d.cancellations} cancellations` : "—"} />
+                    </div>
+                </Section>
+            )}
+
+            {/* ── Route Analytics ── */}
+            <Section title="Route Analytics">
+                <RouteTable title="Most Popular Routes" data={routes.mostPopular} />
+                <RouteTable title="Highest Revenue Routes" data={routes.highestRevenue} />
+                <RouteTable title="Lowest Revenue Routes" data={routes.lowestRevenue} />
+                <RouteTable title="Most Cancelled Routes" data={routes.mostCancelled} />
+            </Section>
+
+            {/* ── Flight Demand ── */}
+            <Section title="Flight Demand Analytics">
+                <DemandTable title="Most Booked Flights" data={demand.mostBooked} />
+                <DemandTable title="Least Booked Flights" data={demand.leastBooked} />
+            </Section>
+
+            {/* ── Peak Travel ── */}
+            <Section title="Peak Travel Analytics">
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {peakTravel.map(d => (
+                        <div key={d.day} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "1rem 1.25rem", minWidth: 110, textAlign: "center" }}>
+                            <div style={{ color: "#94a3b8", fontSize: "0.75rem", marginBottom: 6 }}>{d.day}</div>
+                            <div style={{ color: "#fff", fontSize: "1.5rem", fontWeight: 700 }}>{d.bookings}</div>
+                        </div>
+                    ))}
+                </div>
+            </Section>
+
+            {/* ── Top Customers ── */}
+            <Section title="Top 10 Customers">
+                <table style={tableStyle}>
+                    <thead>
+                        <tr>
+                            {["Name", "Email", "Total Bookings", "Total Spent"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {topCustomers.map(c => (
+                            <tr key={c.email} style={{ borderBottom: "1px solid #334155" }}>
+                                <td style={tdStyle}>{c.name}</td>
+                                <td style={tdStyle}>{c.email}</td>
+                                <td style={tdStyle}>{c.totalBookings}</td>
+                                <td style={tdStyle}>{fmt(c.totalSpent)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Section>
+
+        </div>
+    );
+}
+
+function Section({ title, children }) {
+    return (
+        <div>
+            <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.125rem", color: "#fff", marginBottom: 12 }}>{title}</h2>
+            {children}
+        </div>
+    );
+}
+
+function Card({ label, value, cls }) {
+    return (
+        <div className="admin-card">
+            <div className="admin-card-label">{label}</div>
+            <div className={`admin-card-value ${cls || ""}`}>{value}</div>
+        </div>
+    );
+}
+
+function InsightCard({ label, data, render }) {
+    return (
+        <div className="admin-card">
+            <div className="admin-card-label">{label}</div>
+            <div style={{ color: "#e2e8f0", fontSize: "1rem", fontWeight: 600, marginTop: 6 }}>{render(data)}</div>
+        </div>
+    );
+}
+
+function RouteTable({ title, data }) {
+    return (
+        <div style={{ marginBottom: 16 }}>
+            <div style={{ color: "#94a3b8", fontSize: "0.8125rem", marginBottom: 8 }}>{title}</div>
+            <table style={tableStyle}>
+                <thead>
+                    <tr>{["Route", "Bookings", "Revenue", "Cancellations"].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                    {data.map(r => (
+                        <tr key={r.route} style={{ borderBottom: "1px solid #334155" }}>
+                            <td style={tdStyle}>{r.route}</td>
+                            <td style={tdStyle}>{r.bookings}</td>
+                            <td style={tdStyle}>{fmt(r.revenue)}</td>
+                            <td style={tdStyle}>{r.cancellations}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function DemandTable({ title, data }) {
+    return (
+        <div style={{ marginBottom: 16 }}>
+            <div style={{ color: "#94a3b8", fontSize: "0.8125rem", marginBottom: 8 }}>{title}</div>
+            <table style={tableStyle}>
+                <thead>
+                    <tr>{["Flight Number", "Bookings", "Occupancy %"].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                    {data.map(d => (
+                        <tr key={d.flightNumber} style={{ borderBottom: "1px solid #334155" }}>
+                            <td style={tdStyle}>{d.flightNumber}</td>
+                            <td style={tdStyle}>{d.bookings}</td>
+                            <td style={tdStyle}>{d.occupancyPercent}%</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }

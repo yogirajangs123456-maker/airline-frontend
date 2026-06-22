@@ -78,3 +78,33 @@ export function getAllAdminUsers() {
     return axios.get(`${API}/admin/users`, adminAuthHeader())
         .then(res => res.data);
 }
+
+export function getRevenueAnalytics(days) {
+    return axios.get(`${API}/admin/analytics/revenue`, { params: { days }, ...adminAuthHeader() })
+        .then(res => res.data);
+}
+
+export function getRouteAnalytics() {
+    return axios.get(`${API}/admin/analytics/routes`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getFlightDemandAnalytics() {
+    return axios.get(`${API}/admin/analytics/flight-demand`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getPeakTravelAnalytics() {
+    return axios.get(`${API}/admin/analytics/peak-travel`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getTopCustomers() {
+    return axios.get(`${API}/admin/analytics/top-customers`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getBusinessInsights() {
+    return axios.get(`${API}/admin/analytics/insights`, adminAuthHeader())
+        .then(res => res.data);
+}
