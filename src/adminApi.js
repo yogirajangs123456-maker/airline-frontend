@@ -108,3 +108,53 @@ export function getBusinessInsights() {
     return axios.get(`${API}/admin/analytics/insights`, adminAuthHeader())
         .then(res => res.data);
 }
+
+export function getAllFlightTemplates() {
+    return axios.get(`${API}/admin/flight-templates`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function createFlightTemplate(template) {
+    return axios.post(`${API}/admin/flight-templates`, template, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function updateFlightTemplate(id, template) {
+    return axios.put(`${API}/admin/flight-templates/${id}`, template, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function deleteFlightTemplate(id) {
+    return axios.delete(`${API}/admin/flight-templates/${id}`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function activateFlightTemplate(id) {
+    return axios.patch(`${API}/admin/flight-templates/${id}/activate`, {}, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function deactivateFlightTemplate(id) {
+    return axios.patch(`${API}/admin/flight-templates/${id}/deactivate`, {}, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function generateFlightsNow() {
+    return axios.post(`${API}/admin/flight-templates/generate-now`, {}, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getGeneratedFlights() {
+    return axios.get(`${API}/admin/generated-flights`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function searchGeneratedFlights(params) {
+    return axios.get(`${API}/admin/generated-flights/search`, { params, ...adminAuthHeader() })
+        .then(res => res.data);
+}
+
+export function getAutomationDashboard() {
+    return axios.get(`${API}/admin/generated-flights/dashboard`, adminAuthHeader())
+        .then(res => res.data);
+}

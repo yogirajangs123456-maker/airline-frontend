@@ -276,7 +276,8 @@ function AdminLoginPage({ onLoginSuccess }) {
 
 const NAV_ITEMS = [
     { key: "dashboard", label: "Dashboard", icon: "📊" },
-    { key: "flights", label: "Flights", icon: "✈️" },
+    { key: "templates", label: "Flight Templates", icon: "🗓️" },
+    { key: "generated", label: "Generated Flights", icon: "✈️" },
     { key: "reservations", label: "Reservations", icon: "🎫" },
     { key: "users", label: "Users", icon: "👥" },
     { key: "analytics", label: "Analytics", icon: "📈" },
@@ -360,7 +361,8 @@ function AdminShell({ admin, onLogout }) {
 
     const titles = {
         dashboard: "Dashboard",
-        flights: "Flight Management",
+        templates: "Flight Templates",
+        generated: "Generated Flights",
         reservations: "Reservation Management",
         users: "User Management",
         analytics: "Business Analytics",
@@ -376,7 +378,8 @@ function AdminShell({ admin, onLogout }) {
                 </div>
 
                 {activePage === "dashboard" && <AdminDashboard />}
-                {activePage === "flights" && <AdminFlightManagement />}
+                {activePage === "templates" && <AdminFlightTemplates />}
+                {activePage === "generated" && <AdminGeneratedFlights />}
                 {activePage === "reservations" && <AdminReservationManagement />}
                 {activePage === "users" && <AdminUserManagement />}
                 {activePage === "analytics" && <AdminAnalytics />}
@@ -1029,6 +1032,329 @@ function DemandTable({ title, data }) {
                     ))}
                 </tbody>
             </table>
+        </div>
+    );
+}
+
+function AdminFlightTemplates() {
+    const [templates, setTemplates] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showForm, setShowForm] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState(null);
+    const [generating, setGenerating] = useState(false);
+
+    function loadAll() {
+        setLoading(true);
+        AdminApi.getAllFlightTemplates().then(setTemplates).finally(() => setLoading(false));
+    }
+
+    useEffect(() => { loadAll(); }, []);
+
+    function openAddForm() {
+        setEditingTemplate(null);
+        setShowForm(true);
+    }
+
+    function openEditForm(template) {
+        setEditingTemplate(template);
+        setShowForm(true);
+    }
+
+    async function handleDelete(id) {
+        if (!window.confirm("Delete this template? Already-generated flights will remain.")) return;
+        await AdminApi.deleteFlightTemplate(id);
+        loadAll();
+    }
+
+    async function handleToggleActive(template) {
+        if (template.active) {
+            await AdminApi.deactivateFlightTemplate(template.templateId);
+        } else {
+            await AdminApi.activateFlightTemplate(template.templateId);
+        }
+        loadAll();
+    }
+
+    async function handleGenerateNow() {
+        setGenerating(true);
+        try {
+            const result = await AdminApi.generateFlightsNow();
+            alert(`Generated ${result.flightsCreated} new flights (${result.flightsSkipped} already existed).`);
+            loadAll();
+        } finally {
+            setGenerating(false);
+        }
+    }
+
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem" }}>
+                <button onClick={openAddForm} style={btnPrimary}>+ Create Template</button>
+                <button onClick={handleGenerateNow} disabled={generating} style={btnSecondary}>
+                    {generating ? "Generating…" : "🔄 Generate Flights Now"}
+                </button>
+            </div>
+
+            {loading ? <p style={{ color: "#94a3b8" }}>Loading templates…</p> : (
+                <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                        <thead>
+                            <tr>
+                                {["Flight No.", "Route", "Departure", "Arrival", "Aircraft", "Price", "Seats", "Frequency", "Status", "Actions"].map(h => (
+                                    <th key={h} style={thStyle}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {templates.map(t => (
+                                <tr key={t.templateId} style={{ borderBottom: "1px solid #334155" }}>
+                                    <td style={tdStyle}>{t.flightNumber}</td>
+                                    <td style={tdStyle}>{t.source} → {t.destination}</td>
+                                    <td style={tdStyle}>{t.departureTime}</td>
+                                    <td style={tdStyle}>{t.arrivalTime}</td>
+                                    <td style={tdStyle}>{t.aircraft}</td>
+                                    <td style={tdStyle}>{fmt(t.basePrice)}</td>
+                                    <td style={tdStyle}>{t.totalSeats}</td>
+                                    <td style={tdStyle}>{t.frequency}</td>
+                                    <td style={tdStyle}>
+                                        <span style={statusBadgeStyle(t.active ? "SCHEDULED" : "CANCELLED")}>
+                                            {t.active ? "ACTIVE" : "INACTIVE"}
+                                        </span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                            <button onClick={() => openEditForm(t)} style={btnTiny}>Edit</button>
+                                            <button onClick={() => handleToggleActive(t)} style={btnTiny}>
+                                                {t.active ? "Deactivate" : "Activate"}
+                                            </button>
+                                            <button onClick={() => handleDelete(t.templateId)} style={btnTinyDanger}>Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {templates.length === 0 && <p style={{ color: "#94a3b8", marginTop: 12 }}>No templates yet. Create one to get started.</p>}
+                </div>
+            )}
+
+            {showForm && (
+                <FlightTemplateFormModal
+                    template={editingTemplate}
+                    onClose={() => setShowForm(false)}
+                    onSaved={() => { setShowForm(false); loadAll(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+const FREQUENCY_PRESETS = ["DAILY", "WEEKDAYS", "WEEKENDS", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+function FlightTemplateFormModal({ template, onClose, onSaved }) {
+    const [form, setForm] = useState(template ? {
+        airlineCode: template.airlineCode, airlineName: template.airlineName,
+        flightNumber: template.flightNumber, source: template.source, destination: template.destination,
+        departureTime: template.departureTime, arrivalTime: template.arrivalTime,
+        duration: template.duration || "", aircraft: template.aircraft || "",
+        basePrice: template.basePrice, totalSeats: template.totalSeats, frequency: template.frequency || ""
+    } : {
+        airlineCode: "", airlineName: "", flightNumber: "", source: "", destination: "",
+        departureTime: "", arrivalTime: "", duration: "", aircraft: "",
+        basePrice: "", totalSeats: "", frequency: "DAILY"
+    });
+    const [customDays, setCustomDays] = useState([]);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    function update(field, val) {
+        setForm({ ...form, [field]: val });
+    }
+
+    function toggleDay(day) {
+        const next = customDays.includes(day) ? customDays.filter(d => d !== day) : [...customDays, day];
+        setCustomDays(next);
+        update("frequency", next.join(","));
+    }
+
+    function selectPreset(preset) {
+        if (["DAILY", "WEEKDAYS", "WEEKENDS"].includes(preset)) {
+            setCustomDays([]);
+            update("frequency", preset);
+        } else {
+            toggleDay(preset);
+        }
+    }
+
+    async function handleSave() {
+        setError("");
+        setSaving(true);
+        try {
+            const payload = { ...form, basePrice: parseFloat(form.basePrice), totalSeats: parseInt(form.totalSeats) };
+            if (template) {
+                await AdminApi.updateFlightTemplate(template.templateId, payload);
+            } else {
+                await AdminApi.createFlightTemplate(payload);
+            }
+            onSaved();
+        } catch (err) {
+            setError(err.response?.data?.error || "Failed to save template.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div style={modalOverlayStyle}>
+            <div style={modalCardStyle}>
+                <h2 style={{ color: "#fff", marginBottom: 16, fontFamily: "Sora, sans-serif" }}>
+                    {template ? "Edit Template" : "Create Flight Template"}
+                </h2>
+                {error && <div className="admin-error">{error}</div>}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <FormField label="Airline Code" value={form.airlineCode} onChange={v => update("airlineCode", v)} />
+                    <FormField label="Airline Name" value={form.airlineName} onChange={v => update("airlineName", v)} />
+                    <FormField label="Flight Number" value={form.flightNumber} onChange={v => update("flightNumber", v)} />
+                    <FormField label="Aircraft Type" value={form.aircraft} onChange={v => update("aircraft", v)} />
+                    <FormField label="Source" value={form.source} onChange={v => update("source", v)} />
+                    <FormField label="Destination" value={form.destination} onChange={v => update("destination", v)} />
+                    <FormField label="Departure Time" type="time" value={form.departureTime} onChange={v => update("departureTime", v)} />
+                    <FormField label="Arrival Time" type="time" value={form.arrivalTime} onChange={v => update("arrivalTime", v)} />
+                    <FormField label="Duration (e.g. 2h 10m)" value={form.duration} onChange={v => update("duration", v)} />
+                    <FormField label="Base Price" type="number" value={form.basePrice} onChange={v => update("basePrice", v)} />
+                    <FormField label="Total Seats" type="number" value={form.totalSeats} onChange={v => update("totalSeats", v)} />
+                </div>
+
+                <div style={{ marginTop: 16 }}>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: 8 }}>Frequency</label>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {FREQUENCY_PRESETS.map(p => {
+                            const isActive = form.frequency === p || customDays.includes(p);
+                            return (
+                                <button
+                                    key={p}
+                                    onClick={() => selectPreset(p)}
+                                    style={{
+                                        ...btnTiny,
+                                        background: isActive ? "#3b82f6" : "#334155",
+                                    }}
+                                >
+                                    {p}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p style={{ color: "#64748b", fontSize: "0.75rem", marginTop: 8 }}>
+                        Current: <strong style={{ color: "#e2e8f0" }}>{form.frequency || "none selected"}</strong>
+                    </p>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                    <button onClick={handleSave} disabled={saving} style={btnPrimary}>
+                        {saving ? "Saving…" : "Save Template"}
+                    </button>
+                    <button onClick={onClose} style={btnSecondary}>Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function AdminGeneratedFlights() {
+    const [flights, setFlights] = useState([]);
+    const [dashboard, setDashboard] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState({ source: "", destination: "", date: "", flightNumber: "" });
+
+    function loadAll() {
+        setLoading(true);
+        Promise.all([AdminApi.getGeneratedFlights(), AdminApi.getAutomationDashboard()])
+            .then(([f, d]) => { setFlights(f); setDashboard(d); })
+            .finally(() => setLoading(false));
+    }
+
+    useEffect(() => { loadAll(); }, []);
+
+    function handleSearch() {
+        const params = {};
+        Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
+        setLoading(true);
+        AdminApi.searchGeneratedFlights(params).then(setFlights).finally(() => setLoading(false));
+    }
+
+    function clearFilters() {
+        setFilters({ source: "", destination: "", date: "", flightNumber: "" });
+        loadAll();
+    }
+
+    function computeFlightStatus(flight) {
+        const now = new Date();
+        const departure = new Date(`${flight.journeyDate}T${flight.departureTime}`);
+        const arrival = new Date(`${flight.journeyDate}T${flight.arrivalTime}`);
+        if (!flight.active) return "CANCELLED";
+        if (now < departure) return "SCHEDULED";
+        if (now < arrival) return "DEPARTED";
+        return "COMPLETED";
+    }
+
+    return (
+        <div>
+            {dashboard && (
+                <div className="admin-cards-grid" style={{ marginBottom: "1.5rem" }}>
+                    <Card label="Active Templates" value={dashboard.activeTemplates} />
+                    <Card label="Generated Flights" value={dashboard.totalGeneratedFlights} />
+                    <Card label="Generated Today" value={dashboard.generatedToday} />
+                    <Card label="Upcoming Flights" value={dashboard.upcomingFlights} cls="positive" />
+                    <Card label="Completed Flights" value={dashboard.completedFlights} />
+                    <Card label="Cancelled Flights" value={dashboard.cancelledFlights} cls="negative" />
+                </div>
+            )}
+
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "1.25rem", marginBottom: "1.5rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+                    <input placeholder="Source" value={filters.source} onChange={e => setFilters({ ...filters, source: e.target.value })} style={inputStyle} />
+                    <input placeholder="Destination" value={filters.destination} onChange={e => setFilters({ ...filters, destination: e.target.value })} style={inputStyle} />
+                    <input type="date" value={filters.date} onChange={e => setFilters({ ...filters, date: e.target.value })} style={inputStyle} />
+                    <input placeholder="Flight Number" value={filters.flightNumber} onChange={e => setFilters({ ...filters, flightNumber: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={handleSearch} style={btnPrimary}>Search</button>
+                    <button onClick={clearFilters} style={btnSecondary}>Clear</button>
+                </div>
+            </div>
+
+            {loading ? <p style={{ color: "#94a3b8" }}>Loading flights…</p> : (
+                <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                        <thead>
+                            <tr>
+                                {["Flight No.", "Source", "Destination", "Date", "Dep.", "Arr.", "Seats", "Price", "Status"].map(h => (
+                                    <th key={h} style={thStyle}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {flights.map(f => {
+                                const status = computeFlightStatus(f);
+                                return (
+                                    <tr key={f.flightId} style={{ borderBottom: "1px solid #334155" }}>
+                                        <td style={tdStyle}>{f.flightNumber}</td>
+                                        <td style={tdStyle}>{f.source}</td>
+                                        <td style={tdStyle}>{f.destination}</td>
+                                        <td style={tdStyle}>{f.journeyDate}</td>
+                                        <td style={tdStyle}>{f.departureTime}</td>
+                                        <td style={tdStyle}>{f.arrivalTime}</td>
+                                        <td style={tdStyle}>{f.availableSeats}/{f.totalSeats}</td>
+                                        <td style={tdStyle}>{fmt(f.price)}</td>
+                                        <td style={tdStyle}><span style={statusBadgeStyle(status)}>{status}</span></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    {flights.length === 0 && <p style={{ color: "#94a3b8", marginTop: 12 }}>No generated flights found.</p>}
+                </div>
+            )}
         </div>
     );
 }
