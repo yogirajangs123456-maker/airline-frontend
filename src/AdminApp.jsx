@@ -129,6 +129,7 @@ const adminStyles = `
     font-weight: 500;
     transition: all 0.15s;
     border-left: 3px solid transparent;
+    white-space: nowrap;
   }
   .admin-nav-item:hover { background: #273449; color: #e2e8f0; }
   .admin-nav-item.active {
@@ -192,9 +193,15 @@ const adminStyles = `
       width: 100%;
       flex-direction: row;
       overflow-x: auto;
+      overflow-y: hidden;
       padding: 0.75rem 0;
       border-right: none;
       border-bottom: 1px solid #334155;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .admin-sidebar::-webkit-scrollbar {
+      display: none;
     }
     .admin-sidebar-logo { display: none; }
     .admin-nav-item {
