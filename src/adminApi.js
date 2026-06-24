@@ -158,3 +158,58 @@ export function getAutomationDashboard() {
     return axios.get(`${API}/admin/generated-flights/dashboard`, adminAuthHeader())
         .then(res => res.data);
 }
+
+export function getAllFlightTemplates() {
+    return axios.get(`${API}/admin/flight-templates`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function createFlightTemplate(template) {
+    return axios.post(`${API}/admin/flight-templates`, template, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function updateFlightTemplate(id, template) {
+    return axios.put(`${API}/admin/flight-templates/${id}`, template, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function deleteFlightTemplate(id) {
+    return axios.delete(`${API}/admin/flight-templates/${id}`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function updateTemplateStatus(id, status) {
+    return axios.patch(`${API}/admin/flight-templates/${id}/status`, { status }, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function generateFlightsNow() {
+    return axios.post(`${API}/admin/flight-templates/generate-now`, {}, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getGenerationSettings() {
+    return axios.get(`${API}/admin/generation-settings`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function updateGenerationSettings(windowDays) {
+    return axios.put(`${API}/admin/generation-settings`, { windowDays }, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function getAllFlightsUnified() {
+    return axios.get(`${API}/admin/all-flights`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function searchAllFlights(params) {
+    return axios.get(`${API}/admin/all-flights/search`, { params, ...adminAuthHeader() })
+        .then(res => res.data);
+}
+
+export function getFlightsDashboard() {
+    return axios.get(`${API}/admin/all-flights/dashboard`, adminAuthHeader())
+        .then(res => res.data);
+}

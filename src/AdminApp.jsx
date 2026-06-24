@@ -277,7 +277,8 @@ function AdminLoginPage({ onLoginSuccess }) {
 const NAV_ITEMS = [
     { key: "dashboard", label: "Dashboard", icon: "📊" },
     { key: "templates", label: "Flight Templates", icon: "🗓️" },
-    { key: "generated", label: "Generated Flights", icon: "✈️" },
+    { key: "flights", label: "Flights", icon: "✈️" },
+    { key: "settings", label: "Generation Settings", icon: "⚙️" },
     { key: "reservations", label: "Reservations", icon: "🎫" },
     { key: "users", label: "Users", icon: "👥" },
     { key: "analytics", label: "Analytics", icon: "📈" },
@@ -362,7 +363,8 @@ function AdminShell({ admin, onLogout }) {
     const titles = {
         dashboard: "Dashboard",
         templates: "Flight Templates",
-        generated: "Generated Flights",
+        flights: "All Flights",
+        settings: "Flight Generation Settings",
         reservations: "Reservation Management",
         users: "User Management",
         analytics: "Business Analytics",
@@ -379,7 +381,8 @@ function AdminShell({ admin, onLogout }) {
 
                 {activePage === "dashboard" && <AdminDashboard />}
                 {activePage === "templates" && <AdminFlightTemplates />}
-                {activePage === "generated" && <AdminGeneratedFlights />}
+                {activePage === "flights" && <AdminAllFlights />}
+                {activePage === "settings" && <AdminGenerationSettings />}
                 {activePage === "reservations" && <AdminReservationManagement />}
                 {activePage === "users" && <AdminUserManagement />}
                 {activePage === "analytics" && <AdminAnalytics />}
@@ -1036,6 +1039,18 @@ function DemandTable({ title, data }) {
     );
 }
 
+const STATUS_OPTIONS = ["ACTIVE", "SUSPENDED", "INACTIVE"];
+
+function templateStatusBadge(status) {
+    const colors = {
+        ACTIVE: { bg: "#1e3a2e", fg: "#4ade80" },
+        SUSPENDED: { bg: "#3f2d1e", fg: "#fbbf24" },
+        INACTIVE: { bg: "#3f1e1e", fg: "#f87171" },
+    };
+    const c = colors[status] || colors.INACTIVE;
+    return { background: c.bg, color: c.fg, padding: "3px 10px", borderRadius: 12, fontSize: "0.6875rem", fontWeight: 700 };
+}
+
 function AdminFlightTemplates() {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1061,17 +1076,13 @@ function AdminFlightTemplates() {
     }
 
     async function handleDelete(id) {
-        if (!window.confirm("Delete this template? Already-generated flights will remain.")) return;
+        if (!window.confirm("Delete this template? Already-generated flights will remain unchanged.")) return;
         await AdminApi.deleteFlightTemplate(id);
         loadAll();
     }
 
-    async function handleToggleActive(template) {
-        if (template.active) {
-            await AdminApi.deactivateFlightTemplate(template.templateId);
-        } else {
-            await AdminApi.activateFlightTemplate(template.templateId);
-        }
+    async function handleStatusChange(template, newStatus) {
+        await AdminApi.updateTemplateStatus(template.templateId, newStatus);
         loadAll();
     }
 
@@ -1079,7 +1090,7 @@ function AdminFlightTemplates() {
         setGenerating(true);
         try {
             const result = await AdminApi.generateFlightsNow();
-            alert(`Generated ${result.flightsCreated} new flights (${result.flightsSkipped} already existed).`);
+            alert(`Generated ${result.flightsCreated} new flights (${result.flightsSkipped} already existed). Window: ${result.windowDays} days.`);
             loadAll();
         } finally {
             setGenerating(false);
@@ -1117,16 +1128,18 @@ function AdminFlightTemplates() {
                                     <td style={tdStyle}>{t.totalSeats}</td>
                                     <td style={tdStyle}>{t.frequency}</td>
                                     <td style={tdStyle}>
-                                        <span style={statusBadgeStyle(t.active ? "SCHEDULED" : "CANCELLED")}>
-                                            {t.active ? "ACTIVE" : "INACTIVE"}
-                                        </span>
+                                        <span style={templateStatusBadge(t.status)}>{t.status}</span>
                                     </td>
                                     <td style={tdStyle}>
                                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                             <button onClick={() => openEditForm(t)} style={btnTiny}>Edit</button>
-                                            <button onClick={() => handleToggleActive(t)} style={btnTiny}>
-                                                {t.active ? "Deactivate" : "Activate"}
-                                            </button>
+                                            <select
+                                                value={t.status}
+                                                onChange={e => handleStatusChange(t, e.target.value)}
+                                                style={{ ...btnTiny, cursor: "pointer" }}
+                                            >
+                                                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
                                             <button onClick={() => handleDelete(t.templateId)} style={btnTinyDanger}>Delete</button>
                                         </div>
                                     </td>
@@ -1163,7 +1176,11 @@ function FlightTemplateFormModal({ template, onClose, onSaved }) {
         departureTime: "", arrivalTime: "", duration: "", aircraft: "",
         basePrice: "", totalSeats: "", frequency: "DAILY"
     });
-    const [customDays, setCustomDays] = useState([]);
+    const [customDays, setCustomDays] = useState(
+        template && !["DAILY", "WEEKDAYS", "WEEKENDS"].includes(template.frequency)
+            ? (template.frequency || "").split(",").map(d => d.trim()).filter(Boolean)
+            : []
+    );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -1234,10 +1251,7 @@ function FlightTemplateFormModal({ template, onClose, onSaved }) {
                                 <button
                                     key={p}
                                     onClick={() => selectPreset(p)}
-                                    style={{
-                                        ...btnTiny,
-                                        background: isActive ? "#3b82f6" : "#334155",
-                                    }}
+                                    style={{ ...btnTiny, background: isActive ? "#3b82f6" : "#334155" }}
                                 >
                                     {p}
                                 </button>
@@ -1260,15 +1274,17 @@ function FlightTemplateFormModal({ template, onClose, onSaved }) {
     );
 }
 
-function AdminGeneratedFlights() {
+function AdminAllFlights() {
     const [flights, setFlights] = useState([]);
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [filters, setFilters] = useState({ source: "", destination: "", date: "", flightNumber: "" });
+    const [filters, setFilters] = useState({ source: "", destination: "", date: "", flightNumber: "", sourceType: "" });
+    const [showForm, setShowForm] = useState(false);
+    const [editingFlight, setEditingFlight] = useState(null);
 
     function loadAll() {
         setLoading(true);
-        Promise.all([AdminApi.getGeneratedFlights(), AdminApi.getAutomationDashboard()])
+        Promise.all([AdminApi.getAllFlightsUnified(), AdminApi.getFlightsDashboard()])
             .then(([f, d]) => { setFlights(f); setDashboard(d); })
             .finally(() => setLoading(false));
     }
@@ -1279,12 +1295,20 @@ function AdminGeneratedFlights() {
         const params = {};
         Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
         setLoading(true);
-        AdminApi.searchGeneratedFlights(params).then(setFlights).finally(() => setLoading(false));
+        AdminApi.searchAllFlights(params).then(setFlights).finally(() => setLoading(false));
     }
 
     function clearFilters() {
-        setFilters({ source: "", destination: "", date: "", flightNumber: "" });
+        setFilters({ source: "", destination: "", date: "", flightNumber: "", sourceType: "" });
         loadAll();
+    }
+
+    function quickFilter(sourceType) {
+        setFilters({ ...filters, sourceType });
+        const params = { ...filters, sourceType };
+        Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
+        setLoading(true);
+        AdminApi.searchAllFlights(params).then(setFlights).finally(() => setLoading(false));
     }
 
     function computeFlightStatus(flight) {
@@ -1297,18 +1321,58 @@ function AdminGeneratedFlights() {
         return "COMPLETED";
     }
 
+    function openAddManual() {
+        setEditingFlight(null);
+        setShowForm(true);
+    }
+
+    function openEdit(flight) {
+        setEditingFlight(flight);
+        setShowForm(true);
+    }
+
+    async function handleDelete(id) {
+        if (!window.confirm("Permanently delete this flight?")) return;
+        try {
+            await AdminApi.deleteFlight(id);
+            loadAll();
+        } catch (err) {
+            alert(err.response?.data?.error || "Could not delete (may have existing bookings).");
+        }
+    }
+
+    async function handleCancel(flight) {
+        if (!window.confirm(`Cancel flight ${flight.flightNumber} on ${flight.journeyDate}? This only affects this specific flight.`)) return;
+        await AdminApi.deactivateFlight(flight.flightId);
+        loadAll();
+    }
+
+    async function handleReactivate(flight) {
+        await AdminApi.activateFlight(flight.flightId);
+        loadAll();
+    }
+
     return (
         <div>
             {dashboard && (
                 <div className="admin-cards-grid" style={{ marginBottom: "1.5rem" }}>
                     <Card label="Active Templates" value={dashboard.activeTemplates} />
-                    <Card label="Generated Flights" value={dashboard.totalGeneratedFlights} />
-                    <Card label="Generated Today" value={dashboard.generatedToday} />
-                    <Card label="Upcoming Flights" value={dashboard.upcomingFlights} cls="positive" />
-                    <Card label="Completed Flights" value={dashboard.completedFlights} />
-                    <Card label="Cancelled Flights" value={dashboard.cancelledFlights} cls="negative" />
+                    <Card label="Auto-Generated" value={dashboard.autoFlights} />
+                    <Card label="Manual Flights" value={dashboard.manualFlights} />
+                    <Card label="Upcoming" value={dashboard.upcomingFlights} cls="positive" />
+                    <Card label="Departed" value={dashboard.departedFlights} />
+                    <Card label="Completed" value={dashboard.completedFlights} />
+                    <Card label="Cancelled" value={dashboard.cancelledFlights} cls="negative" />
                 </div>
             )}
+
+            <div style={{ display: "flex", gap: 8, marginBottom: "1rem", flexWrap: "wrap" }}>
+                <button onClick={loadAll} style={{ ...btnTiny, ...(!filters.sourceType ? { background: "#3b82f6" } : {}) }}>All Flights</button>
+                <button onClick={() => quickFilter("AUTO")} style={btnTiny}>Auto Flights</button>
+                <button onClick={() => quickFilter("MANUAL")} style={btnTiny}>Manual Flights</button>
+                <div style={{ flex: 1 }} />
+                <button onClick={openAddManual} style={btnPrimary}>+ Create Manual Flight</button>
+            </div>
 
             <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "1.25rem", marginBottom: "1.5rem" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
@@ -1328,7 +1392,7 @@ function AdminGeneratedFlights() {
                     <table style={tableStyle}>
                         <thead>
                             <tr>
-                                {["Flight No.", "Source", "Destination", "Date", "Dep.", "Arr.", "Seats", "Price", "Status"].map(h => (
+                                {["Flight No.", "Source", "Destination", "Date", "Dep.", "Arr.", "Seats", "Price", "Type", "Status", "Actions"].map(h => (
                                     <th key={h} style={thStyle}>{h}</th>
                                 ))}
                             </tr>
@@ -1336,6 +1400,7 @@ function AdminGeneratedFlights() {
                         <tbody>
                             {flights.map(f => {
                                 const status = computeFlightStatus(f);
+                                const isAuto = f.templateId != null;
                                 return (
                                     <tr key={f.flightId} style={{ borderBottom: "1px solid #334155" }}>
                                         <td style={tdStyle}>{f.flightNumber}</td>
@@ -1346,15 +1411,103 @@ function AdminGeneratedFlights() {
                                         <td style={tdStyle}>{f.arrivalTime}</td>
                                         <td style={tdStyle}>{f.availableSeats}/{f.totalSeats}</td>
                                         <td style={tdStyle}>{fmt(f.price)}</td>
+                                        <td style={tdStyle}>
+                                            <span style={{ ...btnTiny, background: isAuto ? "#1e3a5f" : "#3f2d1e", color: isAuto ? "#60a5fa" : "#fbbf24", cursor: "default" }}>
+                                                {isAuto ? "AUTO" : "MANUAL"}
+                                            </span>
+                                        </td>
                                         <td style={tdStyle}><span style={statusBadgeStyle(status)}>{status}</span></td>
+                                        <td style={tdStyle}>
+                                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                                <button onClick={() => openEdit(f)} style={btnTiny}>Edit</button>
+                                                {f.active ? (
+                                                    <button onClick={() => handleCancel(f)} style={btnTinyDanger}>Cancel</button>
+                                                ) : (
+                                                    <button onClick={() => handleReactivate(f)} style={btnTiny}>Reactivate</button>
+                                                )}
+                                                <button onClick={() => handleDelete(f.flightId)} style={btnTinyDanger}>Delete</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                     </table>
-                    {flights.length === 0 && <p style={{ color: "#94a3b8", marginTop: 12 }}>No generated flights found.</p>}
+                    {flights.length === 0 && <p style={{ color: "#94a3b8", marginTop: 12 }}>No flights found.</p>}
                 </div>
             )}
+
+            {showForm && (
+                <FlightFormModal
+                    flight={editingFlight}
+                    onClose={() => setShowForm(false)}
+                    onSaved={() => { setShowForm(false); loadAll(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+function AdminGenerationSettings() {
+    const [windowDays, setWindowDays] = useState(10);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
+
+    useEffect(() => {
+        AdminApi.getGenerationSettings()
+            .then(data => setWindowDays(data.windowDays))
+            .finally(() => setLoading(false));
+    }, []);
+
+    async function handleSave() {
+        setSaving(true);
+        setMessage("");
+        try {
+            const result = await AdminApi.updateGenerationSettings(windowDays);
+            setMessage(`Window updated to ${result.windowDays} days. ${result.flightsCreated} new flights generated.`);
+        } catch (err) {
+            setMessage(err.response?.data?.error || "Failed to update settings.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    if (loading) return <p style={{ color: "#94a3b8" }}>Loading settings…</p>;
+
+    return (
+        <div style={{ maxWidth: 480 }}>
+            <div className="admin-card">
+                <div className="admin-card-label">Flight Generation Window</div>
+                <p style={{ color: "#94a3b8", fontSize: "0.8125rem", marginTop: 8, marginBottom: 16 }}>
+                    The scheduler will always maintain bookable flights up to this many days in the future.
+                </p>
+
+                <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                    {[5, 10, 15, 30].map(d => (
+                        <button
+                            key={d}
+                            onClick={() => setWindowDays(d)}
+                            style={{
+                                ...btnTiny,
+                                padding: "10px 18px",
+                                fontSize: "0.875rem",
+                                background: windowDays === d ? "#3b82f6" : "#334155",
+                            }}
+                        >
+                            {d} Days
+                        </button>
+                    ))}
+                </div>
+
+                <button onClick={handleSave} disabled={saving} style={btnPrimary}>
+                    {saving ? "Saving…" : "Save Settings"}
+                </button>
+
+                {message && (
+                    <p style={{ color: "#4ade80", fontSize: "0.8125rem", marginTop: 12 }}>{message}</p>
+                )}
+            </div>
         </div>
     );
 }
