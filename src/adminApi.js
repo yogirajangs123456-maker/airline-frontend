@@ -14,6 +14,7 @@ function adminAuthHeader() {
     };
 }
 
+// ── AUTH ──────────────────────────────────────────────────────────────────────
 export function adminLogin(email, password) {
     return axios.post(`${API}/admin/auth/login`, { email, password })
         .then(res => res.data);
@@ -24,11 +25,13 @@ export function verifyAdminSession() {
         .then(res => res.data);
 }
 
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
 export function getDashboardSummary() {
     return axios.get(`${API}/admin/dashboard/summary`, adminAuthHeader())
         .then(res => res.data);
 }
 
+// ── LEGACY FLIGHTS ────────────────────────────────────────────────────────────
 export function searchAdminFlights(params) {
     return axios.get(`${API}/admin/flights/search`, { params, ...adminAuthHeader() })
         .then(res => res.data);
@@ -64,6 +67,7 @@ export function activateFlight(id) {
         .then(res => res.data);
 }
 
+// ── RESERVATIONS ──────────────────────────────────────────────────────────────
 export function getAllAdminReservations() {
     return axios.get(`${API}/admin/reservations`, adminAuthHeader())
         .then(res => res.data);
@@ -74,11 +78,13 @@ export function searchAdminReservations(params) {
         .then(res => res.data);
 }
 
+// ── USERS ─────────────────────────────────────────────────────────────────────
 export function getAllAdminUsers() {
     return axios.get(`${API}/admin/users`, adminAuthHeader())
         .then(res => res.data);
 }
 
+// ── ANALYTICS ─────────────────────────────────────────────────────────────────
 export function getRevenueAnalytics(days) {
     return axios.get(`${API}/admin/analytics/revenue`, { params: { days }, ...adminAuthHeader() })
         .then(res => res.data);
@@ -109,6 +115,7 @@ export function getBusinessInsights() {
         .then(res => res.data);
 }
 
+// ── FLIGHT TEMPLATES ──────────────────────────────────────────────────────────
 export function getAllFlightTemplates() {
     return axios.get(`${API}/admin/flight-templates`, adminAuthHeader())
         .then(res => res.data);
@@ -139,11 +146,28 @@ export function deactivateFlightTemplate(id) {
         .then(res => res.data);
 }
 
+export function updateTemplateStatus(id, status) {
+    return axios.patch(`${API}/admin/flight-templates/${id}/status`, { status }, adminAuthHeader())
+        .then(res => res.data);
+}
+
 export function generateFlightsNow() {
     return axios.post(`${API}/admin/flight-templates/generate-now`, {}, adminAuthHeader())
         .then(res => res.data);
 }
 
+// ── GENERATION SETTINGS ───────────────────────────────────────────────────────
+export function getGenerationSettings() {
+    return axios.get(`${API}/admin/generation-settings`, adminAuthHeader())
+        .then(res => res.data);
+}
+
+export function updateGenerationSettings(windowDays) {
+    return axios.put(`${API}/admin/generation-settings`, { windowDays }, adminAuthHeader())
+        .then(res => res.data);
+}
+
+// ── GENERATED FLIGHTS ─────────────────────────────────────────────────────────
 export function getGeneratedFlights() {
     return axios.get(`${API}/admin/generated-flights`, adminAuthHeader())
         .then(res => res.data);
@@ -159,46 +183,7 @@ export function getAutomationDashboard() {
         .then(res => res.data);
 }
 
-export function getAllFlightTemplates() {
-    return axios.get(`${API}/admin/flight-templates`, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function createFlightTemplate(template) {
-    return axios.post(`${API}/admin/flight-templates`, template, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function updateFlightTemplate(id, template) {
-    return axios.put(`${API}/admin/flight-templates/${id}`, template, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function deleteFlightTemplate(id) {
-    return axios.delete(`${API}/admin/flight-templates/${id}`, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function updateTemplateStatus(id, status) {
-    return axios.patch(`${API}/admin/flight-templates/${id}/status`, { status }, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function generateFlightsNow() {
-    return axios.post(`${API}/admin/flight-templates/generate-now`, {}, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function getGenerationSettings() {
-    return axios.get(`${API}/admin/generation-settings`, adminAuthHeader())
-        .then(res => res.data);
-}
-
-export function updateGenerationSettings(windowDays) {
-    return axios.put(`${API}/admin/generation-settings`, { windowDays }, adminAuthHeader())
-        .then(res => res.data);
-}
-
+// ── UNIFIED ALL FLIGHTS ───────────────────────────────────────────────────────
 export function getAllFlightsUnified() {
     return axios.get(`${API}/admin/all-flights`, adminAuthHeader())
         .then(res => res.data);
