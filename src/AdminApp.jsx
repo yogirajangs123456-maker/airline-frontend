@@ -381,7 +381,7 @@ function AdminShell({ admin, onLogout }) {
 
                 {activePage === "dashboard" && <AdminDashboard />}
                 {activePage === "templates" && <AdminFlightTemplates />}
-                {activePage === "flights" && <AdminFlightManagement />}
+                {activePage === "flights" && <AdminAllFlights />}
                 {activePage === "settings" && <AdminGenerationSettings />}
                 {activePage === "reservations" && <AdminReservationManagement />}
                 {activePage === "users" && <AdminUserManagement />}
