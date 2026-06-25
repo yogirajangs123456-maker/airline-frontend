@@ -1193,6 +1193,27 @@ function CityAutocomplete({ value, onChange, placeholder, allCities }) {
 }
 
 // ─── Flight Results ───────────────────────────────────────────────────────────
+function flightStatusBadgeStyle(status) {
+  const colors = {
+    SCHEDULED: { bg: "#dcfce7", fg: "#166534" },
+    DEPARTED: { bg: "#fef3c7", fg: "#92400e" },
+    COMPLETED: { bg: "#e0e7ff", fg: "#3730a3" },
+    CANCELLED: { bg: "#fee2e2", fg: "#991b1b" },
+  };
+  const c = colors[status] || colors.SCHEDULED;
+  return {
+    display: "inline-block",
+    background: c.bg,
+    color: c.fg,
+    padding: "4px 12px",
+    borderRadius: 8,
+    fontSize: "0.75rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  };
+}
+
 function FlightResults({ context, user, navigate, showToast }) {
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1214,7 +1235,20 @@ function FlightResults({ context, user, navigate, showToast }) {
   });
 
   function selectFlight(flight) {
+    if (flight.status !== "SCHEDULED") {
+      showToast("This flight is no longer available for booking.", "error");
+      return;
+    }
     navigate("seats", { ...context, flight });
+  }
+
+  function statusActionLabel(status) {
+    switch (status) {
+      case "DEPARTED": return "Flight Departed";
+      case "COMPLETED": return "Flight Completed";
+      case "CANCELLED": return "Flight Cancelled";
+      default: return "Select Seat";
+    }
   }
 
   return (
@@ -1246,8 +1280,14 @@ function FlightResults({ context, user, navigate, showToast }) {
         ) : (
           sorted.map(flight => {
             const brand = getAirlineBrand(flight.airlineCode);
+            const isBookable = flight.status === "SCHEDULED";
             return (
-              <div key={flight.flightId} className="flight-card" onClick={() => selectFlight(flight)}>
+              <div
+                key={flight.flightId}
+                className="flight-card"
+                onClick={() => selectFlight(flight)}
+                style={{ cursor: isBookable ? "pointer" : "default", opacity: isBookable ? 1 : 0.7 }}
+              >
                 <div className="airline-logo" style={{ background: brand.bg, color: brand.color }}>
                   {brand.name.split(" ").map(w => w[0]).join("")}
                   <br />
@@ -1276,15 +1316,24 @@ function FlightResults({ context, user, navigate, showToast }) {
                       <div className="route-code">{flight.destination.slice(0, 3).toUpperCase()}</div>
                     </div>
                   </div>
+                  <div style={{ marginTop: 8 }}>
+                    <span style={flightStatusBadgeStyle(flight.status)}>{flight.status}</span>
+                  </div>
                 </div>
                 <div className="flight-meta">
                   <div className="flight-class">Economy</div>
-                  <div className="seats-left">⚡ {flight.availableSeats} seats left</div>
+                  {isBookable && <div className="seats-left">⚡ {flight.availableSeats} seats left</div>}
                 </div>
                 <div className="flight-price">
                   <div className="price-amount">{fmt(flight.price)}</div>
                   <div className="price-label">per person</div>
-                  <button className="book-btn">Select Seat</button>
+                  <button
+                    className="book-btn"
+                    disabled={!isBookable}
+                    style={!isBookable ? { background: "#94a3b8", cursor: "not-allowed" } : {}}
+                  >
+                    {statusActionLabel(flight.status)}
+                  </button>
                 </div>
               </div>
             );
@@ -1662,6 +1711,7 @@ function BookingSuccess({ booking, navigate, showToast }) {
     </div>
   );
 }
+
 // ─── My Bookings ──────────────────────────────────────────────────────────────
 function MyBookings({ user, navigate, showToast }) {
   const [bookings, setBookings] = useState([]);
@@ -1717,7 +1767,8 @@ function MyBookings({ user, navigate, showToast }) {
       ) : (
         bookings.map(b => {
           const confirmedCount = b.passengers.filter(p => p.status === "CONFIRMED").length;
-          const cancelledCount = b.passengers.filter(p => p.status === "CANCELLED").length;
+          const flightStatus = b.flight?.status;
+          const canCancel = confirmedCount > 0 && flightStatus === "SCHEDULED";
           return (
             <div key={b.pnr} className="booking-item" style={{ gridTemplateColumns: "1fr auto", alignItems: "start" }}>
               <div>
@@ -1727,6 +1778,9 @@ function MyBookings({ user, navigate, showToast }) {
                 <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <div className="booking-pnr">{b.pnr}</div>
                   <span className={`badge ${b.status === "ACTIVE" ? "badge-green" : "badge-red"}`}>{b.status}</span>
+                  {flightStatus && (
+                    <span style={flightStatusBadgeStyle(flightStatus)}>Flight: {flightStatus}</span>
+                  )}
                 </div>
 
                 <div style={{ marginTop: 12 }}>
@@ -1751,7 +1805,7 @@ function MyBookings({ user, navigate, showToast }) {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button className="book-btn" onClick={() => downloadTicket(b.pnr)}>📥 Ticket</button>
-                {confirmedCount > 0 && (
+                {canCancel && (
                   <button className="cancel-btn" onClick={() => navigate("cancel", { pnr: b.pnr })}>Cancel Passengers</button>
                 )}
               </div>
@@ -1762,6 +1816,7 @@ function MyBookings({ user, navigate, showToast }) {
     </div>
   );
 }
+
 // ─── Cancel Ticket ────────────────────────────────────────────────────────────
 function CancelTicket({ user, navigate, showToast, context }) {
   const [step, setStep] = useState("pnr"); // pnr | select | refund | otp | done
