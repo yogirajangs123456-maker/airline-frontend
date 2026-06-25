@@ -1347,8 +1347,9 @@ function FlightResults({ context, user, navigate, showToast }) {
 // ─── Seat Selection ───────────────────────────────────────────────────────────
 function SeatSelection({ context, user, navigate, showToast }) {
   const flight = context.flight;
-  const ROWS = 5;
   const COLS = ["A", "B", "C", "D", "E", "F"];
+  const totalSeats = flight.totalSeats || 30; // fallback only if somehow missing
+  const ROWS = Math.ceil(totalSeats / COLS.length);
   const MAX_PASSENGERS = 6;
 
   const [bookedSeats, setBookedSeats] = useState([]);
@@ -1393,6 +1394,13 @@ function SeatSelection({ context, user, navigate, showToast }) {
     return `${row}${col}`;
   }
 
+  // The very last row may not need all 6 columns if totalSeats isn't a multiple of 6.
+  // Example: totalSeats=50 → 9 rows, but row 9 only needs 2 seats (49, 50).
+  function isSeatWithinTotal(row, colIndex) {
+    const seatPosition = (row - 1) * COLS.length + colIndex + 1;
+    return seatPosition <= totalSeats;
+  }
+
   function getSeatClass(seatNum) {
     if (bookedSeats.includes(seatNum)) return "booked";
     if (selectedSeats.includes(seatNum)) return "selected";
@@ -1426,7 +1434,7 @@ function SeatSelection({ context, user, navigate, showToast }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.25rem" }}>
           <h2 style={{ fontFamily: "Sora, sans-serif", fontSize: "1.25rem", fontWeight: 700, color: "#1a1a2e" }}>Select Seats</h2>
           <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600 }}>
-            {selectedSeats.length} / {MAX_PASSENGERS} selected
+            {selectedSeats.length} / {MAX_PASSENGERS} selected · {flight.availableSeats} of {totalSeats} seats available
           </span>
         </div>
 
@@ -1437,10 +1445,10 @@ function SeatSelection({ context, user, navigate, showToast }) {
         </div>
 
         {loading ? <div className="spinner" /> : (
-          <div className="plane-body">
+          <div className="plane-body" style={{ maxHeight: 480, overflowY: "auto" }}>
             <div className="plane-nose">✈</div>
 
-            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 10, position: "sticky", top: 0, background: "#f8fafc", zIndex: 1, paddingBottom: 4 }}>
               <div style={{ width: 20 }} />
               {COLS.map((c, i) => (
                 <>
@@ -1454,6 +1462,16 @@ function SeatSelection({ context, user, navigate, showToast }) {
               <div key={ri} className="seat-row">
                 <div className="seat-row-num">{ri + 1}</div>
                 {COLS.map((col, ci) => {
+                  if (!isSeatWithinTotal(ri + 1, ci)) {
+                    // Last row partially filled — render an empty placeholder
+                    // so column alignment stays correct.
+                    return (
+                      <>
+                        {ci === 3 && <div key={`aisle-${ri}`} className="seat-aisle" />}
+                        <div key={`empty-${ri}-${col}`} style={{ width: 44, height: 44 }} />
+                      </>
+                    );
+                  }
                   const seatNum = getSeatNum(ri + 1, col);
                   const cls = getSeatClass(seatNum);
                   return (
